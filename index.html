@@ -16,6 +16,17 @@
   --btnfg:var(--fg);
   --accent:#111111;
   --accentfg:#ffffff;
+.footer{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  padding:24px 16px 32px;
+}
+
+.footer-logo{
+  max-height:150px;
+  width:auto;
+  opacity:0.95;
 }
 
 body.night{
@@ -185,6 +196,14 @@ code{
     <div id="books"></div>
   </section>
 
+<footer class="footer">
+  <img
+    src="assets/logo-editora-ccla.png"
+    alt="Editora CCLA"
+    class="footer-logo"
+  >
+</footer>
+  
   <!-- LEITOR -->
   <section id="leitor" class="card" style="display:none;">
     <div class="reader-top">
@@ -426,3 +445,4 @@ code{
 
 </body>
 </html>
+
