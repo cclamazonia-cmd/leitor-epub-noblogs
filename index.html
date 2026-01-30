@@ -669,6 +669,47 @@ body.reader-open .footer{display:none}
     } catch(e) {}
   }
 
+  function applyNightOverrides(night){
+    if (!rendition) return;
+
+    const bg = night ? "#0f1115" : "#ffffff";
+    const fg = night ? "#e9edf1" : "#111111";
+
+    // ⚠️ Important: override des éléments qui sont souvent forcés en noir dans certains EPUB
+    const selectors = [
+      "html","body",
+      "p","span","div","section","article",
+      "li","ul","ol",
+      "blockquote","pre","code",
+      "h1","h2","h3","h4","h5","h6",
+      "table","thead","tbody","tr","td","th",
+      "em","strong","b","i",
+      "figcaption","caption"
+    ];
+
+    try {
+      rendition.themes.override("html", "background", bg);
+      rendition.themes.override("body", "background", bg);
+      rendition.themes.override("html", "color", fg);
+      rendition.themes.override("body", "color", fg);
+    } catch(e) {}
+
+    // Force la couleur de texte sur un large éventail d'éléments
+    for (const sel of selectors) {
+      try { rendition.themes.override(sel, "color", fg); } catch(e) {}
+      // Certains EPUB mettent un fond blanc sur des blocs -> on neutralise en nuit
+      if (night) {
+        try { rendition.themes.override(sel, "background", "transparent"); } catch(e) {}
+      }
+    }
+
+    // Liens
+    try { rendition.themes.override("a", "color", night ? "#8ab4f8" : "#0b57d0"); } catch(e) {}
+
+    // Images / SVG: éviter inversion étrange + garder fond transparent
+    try { rendition.themes.override("img,svg", "background", "transparent"); } catch(e) {}
+  }
+
   function applyThemeToRendition() {
     if (!rendition) return;
 
@@ -697,11 +738,15 @@ body.reader-open .footer{display:none}
 
     rendition.themes.select("app");
 
+    // Marges de lecture
     try {
       rendition.themes.override("body", "padding", "18px 18px 24px 18px");
       rendition.themes.override("body", "margin", "0");
       rendition.themes.override("html", "margin", "0");
     } catch(e) {}
+
+    // ✅ Correctif MLS: forcer couleurs en mode nuit (et aussi en mode jour, pour neutraliser styles agressifs)
+    applyNightOverrides(night);
 
     applyReadingPrefs();
     syncJustifyHyphenButtons();
@@ -832,7 +877,6 @@ body.reader-open .footer{display:none}
 
   // ====== REPRISE (TOC / SPINE) ======
   async function displayFromTOCOrSpine(){
-    // 1) TOC (nav)
     try {
       if (book && book.navigation && Array.isArray(book.navigation.toc) && book.navigation.toc.length) {
         const toc = book.navigation.toc;
@@ -844,7 +888,6 @@ body.reader-open .footer{display:none}
       }
     } catch(e) {}
 
-    // 2) spine: premier item linear "yes"
     try {
       const items = book && book.spine && book.spine.items ? book.spine.items : null;
       if (items && items.length) {
@@ -861,7 +904,6 @@ body.reader-open .footer{display:none}
       }
     } catch(e) {}
 
-    // 3) fallback epub.js
     try { await rendition.display(); return true; } catch(e) {}
     return false;
   }
@@ -937,7 +979,6 @@ body.reader-open .footer{display:none}
         spread: "none"
       });
 
-      // mode paginated uniquement
       await applyFlowPaginated(false);
 
       btnPrev.onclick = () => rendition && rendition.prev();
@@ -952,24 +993,11 @@ body.reader-open .footer{display:none}
         await applyFlowPaginated(true);
       };
 
-      btnFontMinus.onclick = () => {
-        fontPct = Math.max(80, fontPct - 10);
-        applyReadingPrefs();
-      };
-      btnFontPlus.onclick = () => {
-        fontPct = Math.min(200, fontPct + 10);
-        applyReadingPrefs();
-      };
+      btnFontMinus.onclick = () => { fontPct = Math.max(80, fontPct - 10); applyReadingPrefs(); };
+      btnFontPlus.onclick  = () => { fontPct = Math.min(200, fontPct + 10); applyReadingPrefs(); };
 
-      btnJustify.onclick = () => {
-        justifyOn = !justifyOn;
-        applyThemeToRendition();
-      };
-
-      btnHyphen.onclick = () => {
-        hyphenOn = !hyphenOn;
-        applyThemeToRendition();
-      };
+      btnJustify.onclick = () => { justifyOn = !justifyOn; applyThemeToRendition(); };
+      btnHyphen.onclick  = () => { hyphenOn  = !hyphenOn;  applyThemeToRendition(); };
 
       if (btnFs) btnFs.onclick = toggleFullscreen;
       if (btnFsExit) btnFsExit.onclick = exitFullscreen;
@@ -979,30 +1007,25 @@ body.reader-open .footer{display:none}
         updateProgressUI(location);
       });
 
+      // IMPORTANT: sur certains EPUB, re-render arrive avec leur CSS -> on ré-applique nos overrides
       rendition.on("rendered", () => applyThemeToRendition());
 
-      // ===== Reprise robuste =====
       if (savedCfi) {
-        try {
-          await rendition.display(savedCfi);
-        } catch(e) {
+        try { await rendition.display(savedCfi); }
+        catch(e) {
           clearPosition(item);
           showNotice("ℹ️ Posição salva incompatível com a nova versão do EPUB. Abrindo no início…");
           await displayFromTOCOrSpine();
         }
       } else {
         const ok = await displayFromTOCOrSpine();
-        if (!ok) {
-          try { await rendition.display(); } catch(e){}
-        }
+        if (!ok) { try { await rendition.display(); } catch(e){} }
       }
 
-      // Applique thème + recale flow
       applyThemeToRendition();
       syncJustifyHyphenButtons();
       await applyFlowPaginated(true);
 
-      // Ensure locations ready then force a first % update
       try {
         await locReadyPromise;
         const loc = rendition && rendition.currentLocation ? rendition.currentLocation() : null;
@@ -1026,7 +1049,6 @@ body.reader-open .footer{display:none}
     showCatalog();
   });
 
-  // navigation clavier (pages)
   document.addEventListener("keydown", (e) => {
     if (!rendition) return;
     if (e.key === "ArrowLeft") { e.preventDefault(); try{ rendition.prev(); } catch(_e){} }
