@@ -160,10 +160,25 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   gap:8px;
 }
 
-.viewer-left{justify-content:flex-start}
-.viewer-center{justify-content:center; flex:1; min-width: 240px;}
-.viewer-right{justify-content:flex-end; gap:8px; flex-wrap:wrap;}
+.viewer-left{
+  justify-content:flex-start;
+  flex-wrap:wrap;           /* PATCH 1: évite les overlaps */
+  max-width: 46%;
+}
 
+.viewer-center{
+  justify-content:center;
+  flex:1;
+  min-width: 240px;
+}
+
+.viewer-right{
+  justify-content:flex-end;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+/* Groupe des boutons "layout" */
 .layout-controls{
   display:flex;
   align-items:center;
@@ -209,7 +224,8 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   background:var(--bg);
 }
 
-@media (max-width: 920px){
+/* ===== PATCH 1: on passe en grid PLUS TÔT pour supprimer tout chevauchement ===== */
+@media (max-width: 1100px){
   .viewer-toolbar{
     display:grid;
     grid-template-columns: 1fr 1fr;
@@ -218,7 +234,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
       "center center";
     gap:10px;
   }
-  .viewer-left{grid-area:left}
+  .viewer-left{grid-area:left; max-width:none}
   .viewer-right{grid-area:right}
   .viewer-center{grid-area:center; justify-content:center; min-width:0}
   .viewer-hint{min-width:0}
@@ -282,6 +298,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   gap:8px;
 }
 
+/* Masquage chrome en plein écran */
 body.fs header{display:none}
 body.fs main{margin:0; padding:0}
 body.fs .card{border-radius:0; box-shadow:none; margin:0; padding:0; border:0}
@@ -435,15 +452,17 @@ body.reader-open .footer{display:none}
   // Thèmes: register 1x
   let themesRegistered = false;
 
-  // Anti-reentrance / anti-loop
-  let layoutApplyScheduled = false;
-  let layoutApplying = false;
-
   // resize debounced
   let resizeTimer = null;
 
+  // relocated timestamp (PATCH 2)
+  let lastRelocatedAt = 0;
+
+  // Hook style (PATCH 3)
+  let hookInstalled = false;
+  let injectedStyleText = "";
+
   // ====== Layout prefs ======
-  // PATCH: flow value valide epub.js: paginated <-> scrolled-doc
   let flowMode   = localStorage.getItem("flowMode") || "paginated";
   if (flowMode !== "paginated" && flowMode !== "scrolled-doc") flowMode = "paginated";
 
@@ -473,6 +492,11 @@ body.reader-open .footer{display:none}
   }
 
   function showError(message) {
+    elError.style.display = "block";
+    elError.innerHTML = escapeHtml(message).replace(/\n/g, "<br>");
+  }
+
+  function showNotice(message) {
     elError.style.display = "block";
     elError.innerHTML = escapeHtml(message).replace(/\n/g, "<br>");
   }
@@ -691,7 +715,7 @@ body.reader-open .footer{display:none}
     if (btnMargin) { btnMargin.textContent = labelMargin(); btnMargin.title = "Margens"; }
     if (btnWidth)  { btnWidth.textContent = `L ${labelWidth()}`; btnWidth.title = "Largura do texto"; }
     if (btnJustify){ btnJustify.textContent = labelJustify(); btnJustify.title = justifyOn ? "Justificação ON" : "Justificação OFF"; }
-    if (btnHyphen) { btnHyphen.textContent = labelHyphen(); btnHyphen.title = hyphenOn ? "Hifenização ON" : "Hifenização OFF"; }
+    if (btnHyphen) { btnHyphen.textContent = labelHyphen(); btnHyphen.title = "Hifenização ON" : "Hifenização OFF"; }
   }
 
   function cycleValue(list, current){
@@ -704,80 +728,109 @@ body.reader-open .footer{display:none}
     if (resizeTimer) clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
       try { rendition.resize(); } catch(e) {}
-    }, 60);
+    }, 70);
   }
 
-  function applyLayoutPrefsNow(){
-    if (!rendition) return;
-    if (layoutApplying) return; // anti re-entrance
-    layoutApplying = true;
+  // ===== PATCH 3: injection CSS (justification + hyphens + marges + largeur) =====
+  function buildInjectedCss(){
+    const align = justifyOn ? "justify" : "start";
+    const hy = hyphenOn ? "auto" : "manual";
+    const pad = `${marginPx}px ${marginPx}px ${marginPx + 6}px ${marginPx}px`;
+    const maxw = (maxWidthCh && maxWidthCh > 0) ? `${maxWidthCh}ch` : "none";
+    const mx = (maxWidthCh && maxWidthCh > 0) ? "auto" : "0";
+    const gap = `${columnGap}px`;
 
-    try {
-      try { rendition.flow(flowMode); } catch(e) {}
+    return `
+:root{
+  -webkit-text-size-adjust: 100%;
+}
+html, body{
+  margin:0 !important;
+}
+body{
+  padding:${pad} !important;
+  max-width:${maxw} !important;
+  margin-left:${mx} !important;
+  margin-right:${mx} !important;
+  column-gap:${gap} !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  hyphens:${hy} !important;
+  -webkit-hyphens:${hy} !important;
+  text-rendering: optimizeLegibility !important;
+}
 
-      const effectiveSpread = (flowMode === "paginated") ? spreadMode : "none";
-      try { rendition.spread(effectiveSpread); } catch(e) {}
-
-      const pad = `${marginPx}px ${marginPx}px ${marginPx + 6}px ${marginPx}px`;
-      try {
-        rendition.themes.override("body", "padding", pad);
-        rendition.themes.override("body", "margin", "0");
-        rendition.themes.override("html", "margin", "0");
-      } catch(e){}
-
-      if (maxWidthCh && maxWidthCh > 0) {
-        try {
-          rendition.themes.override("body", "max-width", `${maxWidthCh}ch`);
-          rendition.themes.override("body", "margin-left", "auto");
-          rendition.themes.override("body", "margin-right", "auto");
-        } catch(e){}
-      } else {
-        try {
-          rendition.themes.override("body", "max-width", "none");
-          rendition.themes.override("body", "margin-left", "0");
-          rendition.themes.override("body", "margin-right", "0");
-        } catch(e){}
-      }
-
-      try { rendition.themes.override("body", "column-gap", `${columnGap}px`); } catch(e){}
-
-      try {
-        rendition.themes.override("p", "text-align", justifyOn ? "justify" : "start");
-        rendition.themes.override("li", "text-align", justifyOn ? "justify" : "start");
-        rendition.themes.override("blockquote", "text-align", justifyOn ? "justify" : "start");
-      } catch(e){}
-
-      const hy = hyphenOn ? "auto" : "manual";
-      try {
-        rendition.themes.override("html", "hyphens", hy);
-        rendition.themes.override("html", "-webkit-hyphens", hy);
-        rendition.themes.override("body", "hyphens", hy);
-        rendition.themes.override("body", "-webkit-hyphens", hy);
-        rendition.themes.override("body", "word-break", "normal");
-        rendition.themes.override("body", "overflow-wrap", "break-word");
-        rendition.themes.override("p", "hyphens", hy);
-        rendition.themes.override("p", "-webkit-hyphens", hy);
-      } catch(e){}
-
-      persistLayoutPrefs();
-      syncLayoutButtons();
-
-    } finally {
-      layoutApplying = false;
-    }
+/* PATCH 3: justification robuste (pas seulement <p>) */
+p, li, blockquote, div, section, article{
+  text-align:${align} !important;
+  hyphens:${hy} !important;
+  -webkit-hyphens:${hy} !important;
+}
+`;
   }
 
-  // PATCH: planifie l'application (évite cascade sur reflow)
-  function applyLayoutPrefs(){
-    if (!rendition) return;
-    if (layoutApplyScheduled) return;
-    layoutApplyScheduled = true;
-    requestAnimationFrame(() => {
-      layoutApplyScheduled = false;
-      applyLayoutPrefsNow();
+  function ensureHook(){
+    if (!rendition || hookInstalled) return;
+    hookInstalled = true;
+
+    rendition.hooks.content.register((contents) => {
+      try{
+        const doc = contents.document;
+        if (!doc) return;
+
+        let style = doc.getElementById("ccla-app-overrides");
+        if (!style) {
+          style = doc.createElement("style");
+          style.id = "ccla-app-overrides";
+          style.type = "text/css";
+          (doc.head || doc.documentElement).appendChild(style);
+        }
+        style.textContent = injectedStyleText || "";
+      } catch(e){}
     });
   }
 
+  function applyInjectedCss(){
+    injectedStyleText = buildInjectedCss();
+    if (!rendition) return;
+
+    // met à jour la section courante + les suivantes (via hook)
+    try{
+      const views = rendition.views && rendition.views();
+      if (views && views.forEach) {
+        views.forEach(v => {
+          try{
+            const doc = v.document;
+            if (!doc) return;
+            let style = doc.getElementById("ccla-app-overrides");
+            if (!style) {
+              style = doc.createElement("style");
+              style.id = "ccla-app-overrides";
+              style.type = "text/css";
+              (doc.head || doc.documentElement).appendChild(style);
+            }
+            style.textContent = injectedStyleText;
+          } catch(e){}
+        });
+      }
+    } catch(e){}
+  }
+
+  function applyLayoutPrefs(){
+    if (!rendition) return;
+
+    // flow/spread restent via API (fiable), le reste via CSS injecté
+    try { rendition.flow(flowMode); } catch(e) {}
+    const effectiveSpread = (flowMode === "paginated") ? spreadMode : "none";
+    try { rendition.spread(effectiveSpread); } catch(e) {}
+
+    persistLayoutPrefs();
+    syncLayoutButtons();
+
+    applyInjectedCss();
+  }
+
+  // ===== THEME day/night =====
   function applyThemeToRendition() {
     if (!rendition) return;
 
@@ -785,35 +838,20 @@ body.reader-open .footer{display:none}
 
     if (!themesRegistered) {
       rendition.themes.register("day", {
-        "body": {
-          "background": "#ffffff",
-          "color": "#111111",
-          "line-height": "1.65",
-          "text-rendering": "optimizeLegibility"
-        },
-        "p": { "line-height": "1.65", "margin": "0 0 1em 0" },
-        "h1,h2,h3": { "line-height": "1.25", "margin": "1.2em 0 .6em 0" },
-        "a": { "color": "#0b57d0" }
+        "body": { "background":"#ffffff","color":"#111111","line-height":"1.65","text-rendering":"optimizeLegibility" },
+        "a": { "color":"#0b57d0" }
       });
-
       rendition.themes.register("night", {
-        "body": {
-          "background": "#0f1115",
-          "color": "#e9edf1",
-          "line-height": "1.65",
-          "text-rendering": "optimizeLegibility"
-        },
-        "p": { "line-height": "1.65", "margin": "0 0 1em 0" },
-        "h1,h2,h3": { "line-height": "1.25", "margin": "1.2em 0 .6em 0" },
-        "a": { "color": "#8ab4f8" }
+        "body": { "background":"#0f1115","color":"#e9edf1","line-height":"1.65","text-rendering":"optimizeLegibility" },
+        "a": { "color":"#8ab4f8" }
       });
-
       themesRegistered = true;
     }
 
     try { rendition.themes.select(night ? "night" : "day"); } catch(e) {}
 
     applyReadingPrefs();
+    ensureHook();
     applyLayoutPrefs();
   }
 
@@ -922,8 +960,48 @@ body.reader-open .footer{display:none}
     }, {passive:true});
   });
 
+  // ===== PATCH 2: anti-freeze pagination =====
+  async function trySwitchFlow(nextFlow){
+    if (!rendition) return;
+
+    // tentative
+    const before = flowMode;
+    flowMode = nextFlow;
+
+    // pagination => spread default "none" si absent
+    if (flowMode !== "paginated") spreadMode = "none";
+
+    const startReloc = lastRelocatedAt;
+    applyLayoutPrefs();
+    debouncedResize();
+
+    // si on passe en paginated, on attend un relocated (sinon fallback)
+    if (nextFlow === "paginated") {
+      const ok = await new Promise((resolve) => {
+        const t0 = performance.now();
+        const timer = setInterval(() => {
+          const elapsed = performance.now() - t0;
+          if (lastRelocatedAt > startReloc) { clearInterval(timer); resolve(true); }
+          else if (elapsed > 900) { clearInterval(timer); resolve(false); }
+        }, 60);
+      });
+
+      if (!ok) {
+        // fallback automatique
+        flowMode = "scrolled-doc";
+        spreadMode = "none";
+        applyLayoutPrefs();
+        debouncedResize();
+        showNotice("⚠️ Este EPUB não suporta bem a paginação neste navegador. Voltei para o modo rolagem (mais estável).");
+      }
+    }
+  }
+
   async function openBook(item) {
     clearError();
+    hookInstalled = false;
+    injectedStyleText = "";
+    lastRelocatedAt = 0;
 
     currentItem = item;
     readingSeconds = loadReadingTime(item);
@@ -967,6 +1045,13 @@ body.reader-open .footer{display:none}
 
       rendition = book.renderTo("viewer", { width: "100%", height: "100%", spread: "none" });
 
+      // relocated timestamp (PATCH 2)
+      rendition.on("relocated", (location) => {
+        lastRelocatedAt = Date.now();
+        savePosition(item, location);
+        updateProgressUI(location);
+      });
+
       btnPrev.onclick = () => rendition && rendition.prev();
       btnNext.onclick = () => rendition && rendition.next();
 
@@ -980,10 +1065,10 @@ body.reader-open .footer{display:none}
       btnFontMinus.onclick = () => { fontPct = Math.max(80, fontPct - 10); applyReadingPrefs(); debouncedResize(); };
       btnFontPlus.onclick  = () => { fontPct = Math.min(200, fontPct + 10); applyReadingPrefs(); debouncedResize(); };
 
-      btnFlow.onclick = () => {
-        flowMode = (flowMode === "paginated") ? "scrolled-doc" : "paginated";
-        applyLayoutPrefs();
-        debouncedResize();
+      // PATCH 2: switch flow sécurisé
+      btnFlow.onclick = async () => {
+        const next = (flowMode === "paginated") ? "scrolled-doc" : "paginated";
+        await trySwitchFlow(next);
       };
 
       btnSpread.onclick = () => {
@@ -997,10 +1082,12 @@ body.reader-open .footer{display:none}
       btnJustify.onclick= () => { justifyOn = !justifyOn; applyLayoutPrefs(); };
       btnHyphen.onclick = () => { hyphenOn = !hyphenOn; applyLayoutPrefs(); };
 
-      rendition.on("relocated", (location) => {
-        savePosition(item, location);
-        updateProgressUI(location);
-      });
+      // ===== SAFE MODE par livre (mls.epub semble problématique) =====
+      // Tu peux ajuster ici si tu confirmes que c'est toujours lui.
+      if (item.id === "geografia-libertaria") {
+        flowMode = "scrolled-doc";
+        spreadMode = "none";
+      }
 
       if (savedCfi) await rendition.display(savedCfi);
       else await rendition.display();
@@ -1008,11 +1095,19 @@ body.reader-open .footer{display:none}
       applyThemeToRendition();
       syncLayoutButtons();
 
+      // si en scrolled-doc, spread doit être désactivé
+      if (btnSpread) btnSpread.disabled = (flowMode !== "paginated");
+
       try {
         await locReadyPromise;
         const loc = rendition && rendition.currentLocation ? rendition.currentLocation() : null;
         if (loc) updateProgressUI(loc);
       } catch(e) {}
+
+      // Petite protection: si ce livre est en safe-mode, on prévient
+      if (item.id === "geografia-libertaria") {
+        showNotice("ℹ️ Este EPUB está em modo estável (rolagem) por padrão, pois a paginação pode travar dependendo do arquivo/navegador.");
+      }
 
     } catch (err) {
       console.error(err);
