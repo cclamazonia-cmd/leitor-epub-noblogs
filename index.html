@@ -164,7 +164,6 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
 .viewer-center{justify-content:center; flex:1; min-width: 240px;}
 .viewer-right{justify-content:flex-end; gap:8px; flex-wrap:wrap;}
 
-/* Groupe des boutons "layout" pour pouvoir wrap proprement */
 .layout-controls{
   display:flex;
   align-items:center;
@@ -173,7 +172,6 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   justify-content:flex-end;
 }
 
-/* Les pills/badges ne doivent pas casser la ligne */
 .pill,.save-badge{white-space:nowrap}
 
 .viewer-hint{
@@ -211,7 +209,6 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   background:var(--bg);
 }
 
-/* ===== Responsive toolbar: évite tout chevauchement ===== */
 @media (max-width: 920px){
   .viewer-toolbar{
     display:grid;
@@ -244,7 +241,6 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   .viewer-right{
     gap:10px;
   }
-  /* Réduit un peu les boutons pour mobile sans casser */
   .btn{padding:9px 10px; font-size:13px; border-radius:11px}
   .pill,.save-badge{font-size:11px; padding:5px 8px}
 }
@@ -286,7 +282,6 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   gap:8px;
 }
 
-/* Masquage chrome en plein écran */
 body.fs header{display:none}
 body.fs main{margin:0; padding:0}
 body.fs .card{border-radius:0; box-shadow:none; margin:0; padding:0; border:0}
@@ -437,17 +432,29 @@ body.reader-open .footer{display:none}
   let saveBadgeTimer = null;
   let locReadyPromise = Promise.resolve(false);
 
-  // PATCH: évite la boucle "rendered -> theme -> re-render -> rendered"
+  // Thèmes: register 1x
   let themesRegistered = false;
 
+  // Anti-reentrance / anti-loop
+  let layoutApplyScheduled = false;
+  let layoutApplying = false;
+
+  // resize debounced
+  let resizeTimer = null;
+
   // ====== Layout prefs ======
-  let flowMode  = localStorage.getItem("flowMode") || "paginated";
-  let spreadMode= localStorage.getItem("spreadMode") || "none";
-  let marginPx  = Number(localStorage.getItem("marginPx") || 18);
-  let maxWidthCh= Number(localStorage.getItem("maxWidthCh") || 72);
-  let justifyOn = (localStorage.getItem("justifyOn") || "0") === "1";
-  let hyphenOn  = (localStorage.getItem("hyphenOn") || "1") === "1";
-  let columnGap = Number(localStorage.getItem("columnGap") || 28);
+  // PATCH: flow value valide epub.js: paginated <-> scrolled-doc
+  let flowMode   = localStorage.getItem("flowMode") || "paginated";
+  if (flowMode !== "paginated" && flowMode !== "scrolled-doc") flowMode = "paginated";
+
+  let spreadMode = localStorage.getItem("spreadMode") || "none";
+  if (spreadMode !== "none" && spreadMode !== "auto") spreadMode = "none";
+
+  let marginPx   = Number(localStorage.getItem("marginPx") || 18);
+  let maxWidthCh = Number(localStorage.getItem("maxWidthCh") || 72);
+  let justifyOn  = (localStorage.getItem("justifyOn") || "0") === "1";
+  let hyphenOn   = (localStorage.getItem("hyphenOn") || "1") === "1";
+  let columnGap  = Number(localStorage.getItem("columnGap") || 28);
 
   const MARGIN_STEPS = [12,18,24,30];
   const WIDTH_STEPS  = [0,60,72,84];
@@ -692,60 +699,85 @@ body.reader-open .footer{display:none}
     return list[(i >= 0 ? i + 1 : 0) % list.length];
   }
 
-  function applyLayoutPrefs(){
+  function debouncedResize(){
     if (!rendition) return;
-
-    try { rendition.flow(flowMode); } catch(e) {}
-
-    const effectiveSpread = (flowMode === "paginated") ? spreadMode : "none";
-    try { rendition.spread(effectiveSpread); } catch(e) {}
-
-    const pad = `${marginPx}px ${marginPx}px ${marginPx + 6}px ${marginPx}px`;
-    try {
-      rendition.themes.override("body", "padding", pad);
-      rendition.themes.override("body", "margin", "0");
-      rendition.themes.override("html", "margin", "0");
-    } catch(e){}
-
-    if (maxWidthCh && maxWidthCh > 0) {
-      try {
-        rendition.themes.override("body", "max-width", `${maxWidthCh}ch`);
-        rendition.themes.override("body", "margin-left", "auto");
-        rendition.themes.override("body", "margin-right", "auto");
-      } catch(e){}
-    } else {
-      try {
-        rendition.themes.override("body", "max-width", "none");
-        rendition.themes.override("body", "margin-left", "0");
-        rendition.themes.override("body", "margin-right", "0");
-      } catch(e){}
-    }
-
-    try { rendition.themes.override("body", "column-gap", `${columnGap}px`); } catch(e){}
-
-    try {
-      rendition.themes.override("p", "text-align", justifyOn ? "justify" : "start");
-      rendition.themes.override("li", "text-align", justifyOn ? "justify" : "start");
-      rendition.themes.override("blockquote", "text-align", justifyOn ? "justify" : "start");
-    } catch(e){}
-
-    const hy = hyphenOn ? "auto" : "manual";
-    try {
-      rendition.themes.override("html", "hyphens", hy);
-      rendition.themes.override("html", "-webkit-hyphens", hy);
-      rendition.themes.override("body", "hyphens", hy);
-      rendition.themes.override("body", "-webkit-hyphens", hy);
-      rendition.themes.override("body", "word-break", "normal");
-      rendition.themes.override("body", "overflow-wrap", "break-word");
-      rendition.themes.override("p", "hyphens", hy);
-      rendition.themes.override("p", "-webkit-hyphens", hy);
-    } catch(e){}
-
-    persistLayoutPrefs();
-    syncLayoutButtons();
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      try { rendition.resize(); } catch(e) {}
+    }, 60);
   }
 
-  // PATCH: thème stable (register 1x) + select day/night (évite la boucle "rendered")
+  function applyLayoutPrefsNow(){
+    if (!rendition) return;
+    if (layoutApplying) return; // anti re-entrance
+    layoutApplying = true;
+
+    try {
+      try { rendition.flow(flowMode); } catch(e) {}
+
+      const effectiveSpread = (flowMode === "paginated") ? spreadMode : "none";
+      try { rendition.spread(effectiveSpread); } catch(e) {}
+
+      const pad = `${marginPx}px ${marginPx}px ${marginPx + 6}px ${marginPx}px`;
+      try {
+        rendition.themes.override("body", "padding", pad);
+        rendition.themes.override("body", "margin", "0");
+        rendition.themes.override("html", "margin", "0");
+      } catch(e){}
+
+      if (maxWidthCh && maxWidthCh > 0) {
+        try {
+          rendition.themes.override("body", "max-width", `${maxWidthCh}ch`);
+          rendition.themes.override("body", "margin-left", "auto");
+          rendition.themes.override("body", "margin-right", "auto");
+        } catch(e){}
+      } else {
+        try {
+          rendition.themes.override("body", "max-width", "none");
+          rendition.themes.override("body", "margin-left", "0");
+          rendition.themes.override("body", "margin-right", "0");
+        } catch(e){}
+      }
+
+      try { rendition.themes.override("body", "column-gap", `${columnGap}px`); } catch(e){}
+
+      try {
+        rendition.themes.override("p", "text-align", justifyOn ? "justify" : "start");
+        rendition.themes.override("li", "text-align", justifyOn ? "justify" : "start");
+        rendition.themes.override("blockquote", "text-align", justifyOn ? "justify" : "start");
+      } catch(e){}
+
+      const hy = hyphenOn ? "auto" : "manual";
+      try {
+        rendition.themes.override("html", "hyphens", hy);
+        rendition.themes.override("html", "-webkit-hyphens", hy);
+        rendition.themes.override("body", "hyphens", hy);
+        rendition.themes.override("body", "-webkit-hyphens", hy);
+        rendition.themes.override("body", "word-break", "normal");
+        rendition.themes.override("body", "overflow-wrap", "break-word");
+        rendition.themes.override("p", "hyphens", hy);
+        rendition.themes.override("p", "-webkit-hyphens", hy);
+      } catch(e){}
+
+      persistLayoutPrefs();
+      syncLayoutButtons();
+
+    } finally {
+      layoutApplying = false;
+    }
+  }
+
+  // PATCH: planifie l'application (évite cascade sur reflow)
+  function applyLayoutPrefs(){
+    if (!rendition) return;
+    if (layoutApplyScheduled) return;
+    layoutApplyScheduled = true;
+    requestAnimationFrame(() => {
+      layoutApplyScheduled = false;
+      applyLayoutPrefsNow();
+    });
+  }
+
   function applyThemeToRendition() {
     if (!rendition) return;
 
@@ -935,9 +967,6 @@ body.reader-open .footer{display:none}
 
       rendition = book.renderTo("viewer", { width: "100%", height: "100%", spread: "none" });
 
-      // PATCH: on SUPPRIME le handler "rendered" qui créait la boucle de re-render.
-      // rendition.on("rendered", () => applyThemeToRendition());
-
       btnPrev.onclick = () => rendition && rendition.prev();
       btnNext.onclick = () => rendition && rendition.next();
 
@@ -948,23 +977,23 @@ body.reader-open .footer{display:none}
         try { await rendition.display(); } catch(e) {}
       };
 
-      btnFontMinus.onclick = () => { fontPct = Math.max(80, fontPct - 10); applyReadingPrefs(); };
-      btnFontPlus.onclick  = () => { fontPct = Math.min(200, fontPct + 10); applyReadingPrefs(); };
+      btnFontMinus.onclick = () => { fontPct = Math.max(80, fontPct - 10); applyReadingPrefs(); debouncedResize(); };
+      btnFontPlus.onclick  = () => { fontPct = Math.min(200, fontPct + 10); applyReadingPrefs(); debouncedResize(); };
 
       btnFlow.onclick = () => {
-        flowMode = (flowMode === "paginated") ? "scrolled" : "paginated";
+        flowMode = (flowMode === "paginated") ? "scrolled-doc" : "paginated";
         applyLayoutPrefs();
-        try { rendition && rendition.resize(); } catch(e) {}
+        debouncedResize();
       };
 
       btnSpread.onclick = () => {
         spreadMode = (spreadMode === "auto") ? "none" : "auto";
         applyLayoutPrefs();
-        try { rendition && rendition.resize(); } catch(e) {}
+        debouncedResize();
       };
 
-      btnMargin.onclick = () => { marginPx = cycleValue(MARGIN_STEPS, marginPx); applyLayoutPrefs(); };
-      btnWidth.onclick  = () => { maxWidthCh = cycleValue(WIDTH_STEPS, maxWidthCh); applyLayoutPrefs(); };
+      btnMargin.onclick = () => { marginPx = cycleValue(MARGIN_STEPS, marginPx); applyLayoutPrefs(); debouncedResize(); };
+      btnWidth.onclick  = () => { maxWidthCh = cycleValue(WIDTH_STEPS, maxWidthCh); applyLayoutPrefs(); debouncedResize(); };
       btnJustify.onclick= () => { justifyOn = !justifyOn; applyLayoutPrefs(); };
       btnHyphen.onclick = () => { hyphenOn = !hyphenOn; applyLayoutPrefs(); };
 
@@ -976,7 +1005,6 @@ body.reader-open .footer{display:none}
       if (savedCfi) await rendition.display(savedCfi);
       else await rendition.display();
 
-      // On applique le thème UNE FOIS après display() (puis il persiste)
       applyThemeToRendition();
       syncLayoutButtons();
 
