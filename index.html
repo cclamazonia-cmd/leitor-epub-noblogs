@@ -266,14 +266,42 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   background:var(--bg);
 }
 
-/* === FIX 1/2 : autoriser le scroll dans #viewer en mode scrolled-doc === */
+/* =========================================================
+   FIX : scroll vertical dès la cover en mode scrolled-doc
+   (forcer le scroll sur les conteneurs internes epub.js)
+   ========================================================= */
+
+/* 1) En scroll: on donne un “cadre” stable */
 body.flow-scroll #viewer{
-  overflow:auto;
+  overflow:hidden; /* IMPORTANT: le scroll se fait sur .epub-container */
   -webkit-overflow-scrolling:touch;
 }
-/* === FIX 2/2 : éviter un scroll parasite en mode paginated === */
+
+/* 2) Conteneurs epub.js: ils doivent pouvoir scroller */
+body.flow-scroll #viewer .epub-container,
+body.flow-scroll #viewer .epub-view{
+  height:100% !important;
+}
+
+/* Le vrai scroller (souvent .epub-container) */
+body.flow-scroll #viewer .epub-container{
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  -webkit-overflow-scrolling:touch;
+}
+
+/* 3) Iframes: éviter qu’ils “cassent” le flux */
+body.flow-scroll #viewer iframe{
+  width:100% !important;
+  display:block;
+}
+
+/* 4) En paginated: pas de scroll parasite */
 body.flow-pages #viewer{
   overflow:hidden;
+}
+body.flow-pages #viewer .epub-container{
+  overflow:hidden !important;
 }
 
 /* Masquer les flèches en mode scroll */
@@ -1071,7 +1099,6 @@ body.reader-open .footer{display:none}
           flowMode = (flowMode === "paginated") ? "scrolled-doc" : "paginated";
           try { localStorage.setItem("flowMode", flowMode); } catch(e){}
           await applyFlowMode(true);
-          // si on revient en scroll, on évite l'accrochage cover
           await escapeCoverIfNeeded();
         };
       }
@@ -1092,8 +1119,6 @@ body.reader-open .footer{display:none}
       rendition.on("relocated", (location) => {
         savePosition(item, location);
         updateProgressUI(location);
-
-        // sécurité: si epub.js s'accroche à la cover en scroll => on saute au contenu
         escapeCoverIfNeeded();
       });
 
@@ -1162,4 +1187,3 @@ body.reader-open .footer{display:none}
 
 </body>
 </html>
-
