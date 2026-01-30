@@ -266,12 +266,6 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   background:var(--bg);
 }
 
-/* Masquer les flèches en mode scroll */
-body.flow-scroll #prevBtn,
-body.flow-scroll #nextBtn{
-  display:none;
-}
-
 /* Fullscreen */
 .fullscreen-exit{
   position:absolute;
@@ -364,7 +358,8 @@ body.reader-open .footer{display:none}
 
         <div class="viewer-center">
           <button class="btn" id="fontMinus" type="button" aria-label="Diminuir fonte">A−</button>
-          <button class="btn" id="modeBtn" type="button" aria-label="Alternar modo de leitura">📜</button>
+          <!-- Mode button kept (UI stable) but disabled: scroll vertical removed -->
+          <button class="btn" id="modeBtn" type="button" aria-label="Modo de leitura (fixo: páginas)" disabled>📄</button>
           <div class="viewer-hint" id="progress">—</div>
           <button class="btn" id="fontPlus" type="button" aria-label="Aumentar fonte">A+</button>
         </div>
@@ -441,9 +436,8 @@ body.reader-open .footer{display:none}
   let justifyOn = (localStorage.getItem("justifyOn") || "0") === "1";
   let hyphenOn  = (localStorage.getItem("hyphenOn")  || "1") === "1";
 
-  // Flow mode: défaut = scroll vertical continu
-  let flowMode = localStorage.getItem("flowMode") || "scrolled-doc";
-  if (flowMode !== "scrolled-doc" && flowMode !== "paginated") flowMode = "scrolled-doc";
+  // Mode fixé: paginated uniquement (scroll vertical supprimé)
+  const FLOW_MODE = "paginated";
 
   // Hook lang (par rendition)
   let langHookInstalled = false;
@@ -631,7 +625,7 @@ body.reader-open .footer{display:none}
   }
 
   function stopReadingTimer(){
-    if (rafId) cancelAnimationFrame(rafId);
+    if (rafId) cancelAnimationFrame(rafId); // FIX: annuler l'id, pas la fonction
     rafId = null;
     commitChunks();
     carryMs = 0;
@@ -659,55 +653,6 @@ body.reader-open .footer{display:none}
   function syncJustifyHyphenButtons(){
     if (btnJustify) btnJustify.textContent = justifyOn ? "J✓" : "J";
     if (btnHyphen)  btnHyphen.textContent  = hyphenOn  ? "Hy✓" : "Hy";
-  }
-
-  // ====== FLOW MODE (scroll vs pages) ======
-  function labelMode(){
-    return (flowMode === "paginated") ? "📄" : "📜";
-  }
-
-  function syncModeUI(){
-    document.body.classList.toggle("flow-scroll", flowMode !== "paginated");
-    document.body.classList.toggle("flow-pages", flowMode === "paginated");
-
-    if (btnMode) {
-      btnMode.textContent = labelMode();
-      btnMode.setAttribute(
-        "aria-label",
-        flowMode === "paginated"
-          ? "Mudar para rolagem (scroll)"
-          : "Mudar para página por página"
-      );
-    }
-  }
-
-  async function applyFlowMode(keepLocation = true){
-    if (!rendition) return;
-
-    let cfi = null;
-    if (keepLocation) {
-      try {
-        const loc = rendition.currentLocation && rendition.currentLocation();
-        cfi = loc && loc.start && loc.start.cfi ? loc.start.cfi : null;
-      } catch(e){}
-    }
-
-    try { rendition.spread("none"); } catch(e){}
-
-    try {
-      rendition.flow(flowMode); // "scrolled-doc" ou "paginated"
-    } catch(e){
-      flowMode = "scrolled-doc";
-      try { rendition.flow(flowMode); } catch(_e){}
-    }
-
-    syncModeUI();
-
-    try {
-      if (cfi) await rendition.display(cfi);
-    } catch(e){}
-
-    try { rendition.resize(); } catch(e){}
   }
 
   // ====== THEME + TEXT LAYOUT (justify/hyphen) ======
@@ -888,51 +833,7 @@ body.reader-open .footer{display:none}
     elProgress.textContent = pagePart + pctPart;
   }
 
-  // ====== COVER DETECTION ======
-  function looksLikeCoverHref(href){
-    const h = String(href || "").toLowerCase();
-    return h.includes("cover") || h.includes("titlepage") || h.includes("capa");
-  }
-
-  function isCoverSpineItem(it){
-    if (!it) return false;
-    const href = String(it.href || "").toLowerCase();
-    const id = String(it.idref || it.id || "").toLowerCase();
-    const props = String(it.properties || "").toLowerCase();
-
-    if (props.includes("cover")) return true;
-    if (href.includes("cover") || href.includes("titlepage") || href.includes("capa")) return true;
-    if (id.includes("cover") || id.includes("titlepage")) return true;
-    return false;
-  }
-
-  function locationLooksLikeCover(loc){
-    const href = loc && loc.start && (loc.start.href || loc.start.url || "");
-    if (href && looksLikeCoverHref(href)) return true;
-
-    const idx = loc && loc.start && typeof loc.start.index === "number" ? loc.start.index : null;
-    if (idx !== null && book && book.spine && Array.isArray(book.spine.items)) {
-      return isCoverSpineItem(book.spine.items[idx]);
-    }
-    return false;
-  }
-
-  async function displayCoverFirstIfAny(){
-    if (!book || !rendition || !book.spine || !Array.isArray(book.spine.items)) return false;
-
-    const items = book.spine.items;
-    const coverItem = items.find(it => isCoverSpineItem(it)) || null;
-    const href = coverItem && coverItem.href ? coverItem.href : null;
-    if (!href) return false;
-
-    try {
-      await rendition.display(href);
-      return true;
-    } catch(e){
-      return false;
-    }
-  }
-
+  // ====== REPRISE (TOC / SPINE) ======
   async function displayFromTOCOrSpine(){
     // 1) TOC (nav)
     try {
@@ -963,144 +864,28 @@ body.reader-open .footer{display:none}
       }
     } catch(e) {}
 
-    // 3) fallback
+    // 3) fallback epub.js
     try { await rendition.display(); return true; } catch(e) {}
     return false;
   }
 
-  // ====== EDGE SCROLL BRIDGE (FIX) ======
-  let edgeBridgeInstalled = false;
-  let edgeCooldown = false;
-  let touchStartY = null;
-  const EDGE_EPS = 2;
+  async function applyFlowPaginated(keepLocation = true){
+    if (!rendition) return;
 
-  function getActiveScrollInfo(){
-    // epub.js crée des iframes / documents internes
-    try {
-      if (!rendition || typeof rendition.getContents !== "function") return null;
-      const contents = rendition.getContents();
-      if (!contents || !contents.length) return null;
-
-      // on prend le “premier” contenu actif (suffisant en scrolled-doc)
-      const c = contents[0];
-      const doc = c && c.document ? c.document : null;
-      if (!doc) return null;
-
-      const scroller = doc.scrollingElement || doc.documentElement || doc.body;
-      if (!scroller) return null;
-
-      const st = scroller.scrollTop || 0;
-      const sh = scroller.scrollHeight || 0;
-      const ch = scroller.clientHeight || 0;
-      return { scroller, st, sh, ch };
-    } catch(e){
-      return null;
+    let cfi = null;
+    if (keepLocation) {
+      try {
+        const loc = rendition.currentLocation && rendition.currentLocation();
+        cfi = loc && loc.start && loc.start.cfi ? loc.start.cfi : null;
+      } catch(e){}
     }
-  }
 
-  function isAtBottom(info){
-    if (!info) return true;
-    return (info.st + info.ch) >= (info.sh - EDGE_EPS);
-  }
+    try { rendition.spread("none"); } catch(e){}
+    try { rendition.flow(FLOW_MODE); } catch(e){}
 
-  function isAtTop(info){
-    if (!info) return true;
-    return info.st <= EDGE_EPS;
-  }
-
-  function canEdgeBridge(){
-    return !!rendition && flowMode === "scrolled-doc";
-  }
-
-  function edgeNext(){
-    if (!rendition) return;
-    if (edgeCooldown) return;
-    edgeCooldown = true;
-    setTimeout(() => { edgeCooldown = false; }, 260);
-    try { rendition.next(); } catch(e){}
-  }
-
-  function edgePrev(){
-    if (!rendition) return;
-    if (edgeCooldown) return;
-    edgeCooldown = true;
-    setTimeout(() => { edgeCooldown = false; }, 260);
-    try { rendition.prev(); } catch(e){}
-  }
-
-  function installEdgeBridge(){
-    if (edgeBridgeInstalled) return;
-    if (!viewerShell) return;
-    edgeBridgeInstalled = true;
-
-    // Wheel: ne capte QUE si (cover) ou (top/bottom atteints)
-    viewerShell.addEventListener("wheel", (e) => {
-      if (!canEdgeBridge()) return;
-
-      const dy = e.deltaY || 0;
-      if (Math.abs(dy) < 3) return;
-
-      const loc = rendition.currentLocation && rendition.currentLocation();
-      const onCover = locationLooksLikeCover(loc);
-
-      const info = getActiveScrollInfo();
-      const atBottom = isAtBottom(info);
-      const atTop = isAtTop(info);
-
-      if ((dy > 0 && (onCover || atBottom)) || (dy < 0 && (onCover || atTop))) {
-        e.preventDefault();
-        if (dy > 0) edgeNext();
-        else edgePrev();
-      }
-      // sinon, on laisse scroller normalement
-    }, {passive:false});
-
-    // Touch: on “swipe” uniquement si (cover) ou (top/bottom)
-    viewerShell.addEventListener("touchstart", (e) => {
-      if (!canEdgeBridge()) return;
-      const t = e.touches && e.touches[0];
-      if (!t) return;
-      touchStartY = t.clientY;
-    }, {passive:true});
-
-    viewerShell.addEventListener("touchmove", (e) => {
-      if (!canEdgeBridge()) return;
-
-      const loc = rendition.currentLocation && rendition.currentLocation();
-      const onCover = locationLooksLikeCover(loc);
-
-      const info = getActiveScrollInfo();
-      const atBottom = isAtBottom(info);
-      const atTop = isAtTop(info);
-
-      if (onCover || atBottom || atTop) {
-        // on évite le scroll mort / rubber band aux extrémités
-        e.preventDefault();
-      }
-    }, {passive:false});
-
-    viewerShell.addEventListener("touchend", (e) => {
-      if (!canEdgeBridge()) { touchStartY = null; return; }
-      if (touchStartY === null) return;
-
-      const t = (e.changedTouches && e.changedTouches[0]) || null;
-      if (!t) { touchStartY = null; return; }
-
-      const dy = touchStartY - t.clientY;
-      touchStartY = null;
-
-      if (Math.abs(dy) < 26) return;
-
-      const loc = rendition.currentLocation && rendition.currentLocation();
-      const onCover = locationLooksLikeCover(loc);
-
-      const info = getActiveScrollInfo();
-      const atBottom = isAtBottom(info);
-      const atTop = isAtTop(info);
-
-      if (dy > 0 && (onCover || atBottom)) edgeNext();
-      else if (dy < 0 && (onCover || atTop)) edgePrev();
-    }, {passive:true});
+    // Re-afficher la même position après changement de flow
+    try { if (cfi) await rendition.display(cfi); } catch(e){}
+    try { rendition.resize(); } catch(e){}
   }
 
   // ====== EPUB ======
@@ -1137,6 +922,7 @@ body.reader-open .footer{display:none}
       }
       book = null;
 
+      // reset par ouverture
       langHookInstalled = false;
 
       const path = "epubs/" + item.file;
@@ -1155,12 +941,12 @@ body.reader-open .footer{display:none}
         spread: "none"
       });
 
-      // FIX: bridge edges en scrolled-doc (cover + fin de chapitre)
-      installEdgeBridge();
-
-      // Applique mode par défaut (scroll) avant 1ère display
-      syncModeUI();
-      await applyFlowMode(false);
+      // mode paginated uniquement
+      if (btnMode) {
+        btnMode.textContent = "📄";
+        btnMode.disabled = true;
+      }
+      await applyFlowPaginated(false);
 
       btnPrev.onclick = () => rendition && rendition.prev();
       btnNext.onclick = () => rendition && rendition.next();
@@ -1169,13 +955,9 @@ body.reader-open .footer{display:none}
         if (!currentItem || !rendition) return;
         clearPosition(currentItem);
         elProgress.textContent = "Carregando…";
-        try {
-          // restart = revenir à la cover si elle existe, sinon début
-          const okCover = await displayCoverFirstIfAny();
-          if (!okCover) await displayFromTOCOrSpine();
-        } catch(e){}
+        try { await displayFromTOCOrSpine(); } catch(e){}
         applyThemeToRendition();
-        await applyFlowMode(true);
+        await applyFlowPaginated(true);
       };
 
       btnFontMinus.onclick = () => {
@@ -1186,14 +968,6 @@ body.reader-open .footer{display:none}
         fontPct = Math.min(200, fontPct + 10);
         applyReadingPrefs();
       };
-
-      if (btnMode) {
-        btnMode.onclick = async () => {
-          flowMode = (flowMode === "paginated") ? "scrolled-doc" : "paginated";
-          try { localStorage.setItem("flowMode", flowMode); } catch(e){}
-          await applyFlowMode(true);
-        };
-      }
 
       btnJustify.onclick = () => {
         justifyOn = !justifyOn;
@@ -1215,32 +989,26 @@ body.reader-open .footer{display:none}
 
       rendition.on("rendered", () => applyThemeToRendition());
 
-      // ===== Reprise robuste (avec cover au démarrage) =====
+      // ===== Reprise robuste =====
       if (savedCfi) {
         try {
           await rendition.display(savedCfi);
         } catch(e) {
           clearPosition(item);
           showNotice("ℹ️ Posição salva incompatível com a nova versão do EPUB. Abrindo no início…");
-          // si position cassée: on montre la cover d’abord
-          const okCover = await displayCoverFirstIfAny();
-          if (!okCover) await displayFromTOCOrSpine();
+          await displayFromTOCOrSpine();
         }
       } else {
-        // IMPORTANT: ouvrir sur la cover si elle existe
-        const okCover = await displayCoverFirstIfAny();
-        if (!okCover) {
-          const ok = await displayFromTOCOrSpine();
-          if (!ok) {
-            try { await rendition.display(); } catch(e){}
-          }
+        const ok = await displayFromTOCOrSpine();
+        if (!ok) {
+          try { await rendition.display(); } catch(e){}
         }
       }
 
       // Applique thème + recale flow
       applyThemeToRendition();
       syncJustifyHyphenButtons();
-      await applyFlowMode(true);
+      await applyFlowPaginated(true);
 
       // Ensure locations ready then force a first % update
       try {
@@ -1266,17 +1034,15 @@ body.reader-open .footer{display:none}
     showCatalog();
   });
 
-  // navigation clavier (uniquement en pages)
+  // navigation clavier (pages)
   document.addEventListener("keydown", (e) => {
     if (!rendition) return;
-    if (flowMode !== "paginated") return;
     if (e.key === "ArrowLeft") { e.preventDefault(); try{ rendition.prev(); } catch(_e){} }
     if (e.key === "ArrowRight"){ e.preventDefault(); try{ rendition.next(); } catch(_e){} }
   });
 
   initTheme();
   syncJustifyHyphenButtons();
-  syncModeUI();
   renderCatalog();
 })();
 </script>
