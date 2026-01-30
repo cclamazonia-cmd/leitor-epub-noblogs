@@ -358,8 +358,6 @@ body.reader-open .footer{display:none}
 
         <div class="viewer-center">
           <button class="btn" id="fontMinus" type="button" aria-label="Diminuir fonte">A−</button>
-          <!-- Mode button kept (UI stable) but disabled: scroll vertical removed -->
-          <button class="btn" id="modeBtn" type="button" aria-label="Modo de leitura (fixo: páginas)" disabled>📄</button>
           <div class="viewer-hint" id="progress">—</div>
           <button class="btn" id="fontPlus" type="button" aria-label="Aumentar fonte">A+</button>
         </div>
@@ -415,7 +413,6 @@ body.reader-open .footer{display:none}
   const btnRestart = document.getElementById("restartBtn");
   const btnFontMinus = document.getElementById("fontMinus");
   const btnFontPlus  = document.getElementById("fontPlus");
-  const btnMode      = document.getElementById("modeBtn");
   const btnJustify   = document.getElementById("justifyBtn");
   const btnHyphen    = document.getElementById("hyphenBtn");
 
@@ -436,7 +433,7 @@ body.reader-open .footer{display:none}
   let justifyOn = (localStorage.getItem("justifyOn") || "0") === "1";
   let hyphenOn  = (localStorage.getItem("hyphenOn")  || "1") === "1";
 
-  // Mode fixé: paginated uniquement (scroll vertical supprimé)
+  // Mode fixé : pages (horizontal) uniquement
   const FLOW_MODE = "paginated";
 
   // Hook lang (par rendition)
@@ -883,7 +880,6 @@ body.reader-open .footer{display:none}
     try { rendition.spread("none"); } catch(e){}
     try { rendition.flow(FLOW_MODE); } catch(e){}
 
-    // Re-afficher la même position après changement de flow
     try { if (cfi) await rendition.display(cfi); } catch(e){}
     try { rendition.resize(); } catch(e){}
   }
@@ -942,10 +938,6 @@ body.reader-open .footer{display:none}
       });
 
       // mode paginated uniquement
-      if (btnMode) {
-        btnMode.textContent = "📄";
-        btnMode.disabled = true;
-      }
       await applyFlowPaginated(false);
 
       btnPrev.onclick = () => rendition && rendition.prev();
