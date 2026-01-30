@@ -108,7 +108,7 @@ body.reader-open main{max-width:min(1200px, 96vw)}
 h2{margin:0 0 8px 0;font-size:18px}
 p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
 
-/* ===== Catalogue (avec covers) ===== */
+/* ===== Catalogue (covers) ===== */
 .book{
   display:flex;
   justify-content:space-between;
@@ -266,7 +266,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   background:var(--bg);
 }
 
-/* Masquer les flèches en mode scroll (elles apparaissent en mode pages) */
+/* Masquer les flèches en mode scroll */
 body.flow-scroll #prevBtn,
 body.flow-scroll #nextBtn{
   display:none;
@@ -399,9 +399,8 @@ body.reader-open .footer{display:none}
 
   // ====== CONFIG ======
   const BOOKS = [
-    // IMPORTANT: adapte ici tes chemins EXACTS. Si tes fichiers ont des espaces, garde-les.
-    { id: "extrativismo", title: "Extrativismo", author: "Anna Bednik e Jérémy Dotti", file: "extrativismo.epub", cover: "assets/covers/capa-extrativismo.jpg" },
-    { id: "geografia-libertaria", title: "Por uma Geografia libertária", author: "Marcelo Lopes de Souza", file: "mls.epub", cover: "assets/covers/capa-mls.jpg" }
+    { id: "extrativismo", title: "Extrativismo", author: "Anna Bednik e Jérémy Dotti", file: "extrativismo.epub", cover: "assets/covers/capa extrativismo.jpg" },
+    { id: "geografia-libertaria", title: "Por uma Geografia libertária", author: "Marcelo Lopes de Souza", file: "mls.epub", cover: "assets/covers/capa mls.jpg" }
   ];
 
   // ====== DOM ======
@@ -442,12 +441,15 @@ body.reader-open .footer{display:none}
   let justifyOn = (localStorage.getItem("justifyOn") || "0") === "1";
   let hyphenOn  = (localStorage.getItem("hyphenOn")  || "1") === "1";
 
-  // Flow mode: par défaut scroll vertical continu
+  // Flow mode: défaut = scroll vertical continu
   let flowMode = localStorage.getItem("flowMode") || "scrolled-doc";
   if (flowMode !== "scrolled-doc" && flowMode !== "paginated") flowMode = "scrolled-doc";
 
   // Hook lang (par rendition)
   let langHookInstalled = false;
+
+  // Anti-bloquage sur la couverture (en scroll) : une seule fois par ouverture
+  let coverEscapedOnce = false;
 
   // ====== TIMER ======
   let readingSeconds = 0;
@@ -693,7 +695,6 @@ body.reader-open .footer{display:none}
       } catch(e){}
     }
 
-    // Spread none pour éviter double page (plus stable)
     try { rendition.spread("none"); } catch(e){}
 
     try {
@@ -705,7 +706,6 @@ body.reader-open .footer{display:none}
 
     syncModeUI();
 
-    // Re-display au même endroit
     try {
       if (cfi) await rendition.display(cfi);
     } catch(e){}
@@ -933,6 +933,49 @@ body.reader-open .footer{display:none}
     return false;
   }
 
+  // ====== ANTI-BLOCAGE COVER EN SCROLL ======
+  function isCoverSpineItem(it){
+    if (!it) return false;
+    const href = String(it.href || "").toLowerCase();
+    const id = String(it.idref || it.id || "").toLowerCase();
+    const props = String(it.properties || "").toLowerCase();
+
+    if (props.includes("cover")) return true;
+    if (href.includes("cover") || href.includes("titlepage") || href.includes("capa")) return true;
+    if (id.includes("cover") || id.includes("titlepage")) return true;
+    return false;
+  }
+
+  function locationLooksLikeCover(loc){
+    const href = loc && loc.start && (loc.start.href || loc.start.url || "");
+    if (href && looksLikeCoverHref(href)) return true;
+
+    const idx = loc && loc.start && typeof loc.start.index === "number" ? loc.start.index : null;
+    if (idx !== null && book && book.spine && Array.isArray(book.spine.items)) {
+      return isCoverSpineItem(book.spine.items[idx]);
+    }
+    return false;
+  }
+
+  async function escapeCoverIfNeeded(){
+    if (!rendition || !book) return false;
+    if (flowMode !== "scrolled-doc") return false;
+    if (coverEscapedOnce) return false;
+
+    let loc = null;
+    try { loc = rendition.currentLocation && rendition.currentLocation(); } catch(e){}
+    if (!locationLooksLikeCover(loc)) return false;
+
+    coverEscapedOnce = true;
+
+    try {
+      await displayFromTOCOrSpine();
+      await applyFlowMode(true);
+    } catch(e){}
+
+    return true;
+  }
+
   // ====== EPUB ======
   async function openBook(item) {
     clearError();
@@ -967,8 +1010,9 @@ body.reader-open .footer{display:none}
       }
       book = null;
 
-      // reset hook per nouvelle rendition
+      // reset par ouverture
       langHookInstalled = false;
+      coverEscapedOnce = false;
 
       const path = "epubs/" + item.file;
 
@@ -986,7 +1030,7 @@ body.reader-open .footer{display:none}
         spread: "none"
       });
 
-      // Applique mode par défaut immédiatement (scroll), avant la 1ère display
+      // Applique mode par défaut (scroll) avant 1ère display
       syncModeUI();
       await applyFlowMode(false);
 
@@ -998,7 +1042,9 @@ body.reader-open .footer{display:none}
         clearPosition(currentItem);
         elProgress.textContent = "Carregando…";
         try { await displayFromTOCOrSpine(); } catch(e){}
+        applyThemeToRendition();
         await applyFlowMode(true);
+        await escapeCoverIfNeeded();
       };
 
       btnFontMinus.onclick = () => {
@@ -1015,6 +1061,8 @@ body.reader-open .footer{display:none}
           flowMode = (flowMode === "paginated") ? "scrolled-doc" : "paginated";
           try { localStorage.setItem("flowMode", flowMode); } catch(e){}
           await applyFlowMode(true);
+          // si on revient en scroll, on évite l'accrochage cover
+          await escapeCoverIfNeeded();
         };
       }
 
@@ -1034,6 +1082,9 @@ body.reader-open .footer{display:none}
       rendition.on("relocated", (location) => {
         savePosition(item, location);
         updateProgressUI(location);
+
+        // sécurité: si epub.js s'accroche à la cover en scroll => on saute au contenu
+        escapeCoverIfNeeded();
       });
 
       rendition.on("rendered", () => applyThemeToRendition());
@@ -1054,10 +1105,11 @@ body.reader-open .footer{display:none}
         }
       }
 
-      // applique thème + recale le mode sur la position actuelle
+      // Applique thème + recale flow + anti-cover
       applyThemeToRendition();
       syncJustifyHyphenButtons();
       await applyFlowMode(true);
+      await escapeCoverIfNeeded();
 
       // Ensure locations ready then force a first % update
       try {
@@ -1083,6 +1135,14 @@ body.reader-open .footer{display:none}
     showCatalog();
   });
 
+  // navigation clavier (uniquement en pages)
+  document.addEventListener("keydown", (e) => {
+    if (!rendition) return;
+    if (flowMode !== "paginated") return;
+    if (e.key === "ArrowLeft") { e.preventDefault(); try{ rendition.prev(); } catch(_e){} }
+    if (e.key === "ArrowRight"){ e.preventDefault(); try{ rendition.next(); } catch(_e){} }
+  });
+
   initTheme();
   syncJustifyHyphenButtons();
   syncModeUI();
@@ -1092,4 +1152,3 @@ body.reader-open .footer{display:none}
 
 </body>
 </html>
-
