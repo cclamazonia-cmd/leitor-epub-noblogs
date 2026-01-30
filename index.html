@@ -325,134 +325,23 @@ body.reader-open .footer{display:none}
 
   let saveBadgeTimer = null;
 
-  // ===== TIMER (FIXED) =====
-  let readingSeconds = 0;
-  let readingTimeoutId = null;
+  // ===== TIMER (robuste, tranche 30s, basé sur temps réel actif) =====
+  let readingSeconds = 0;        // temps sauvegardé (multiple de 30)
+  let readingTickId = null;      // interval UI + calcul
+  let activeStartMs = null;      // moment où la session active a commencé (ms)
+  let activeCarryMs = 0;         // ms actifs accumulés mais pas encore convertis en 30s
 
-  let locReadyPromise = Promise.resolve(false);
-
-  function escapeHtml(value) {
-    return String(value ?? "").replace(/[&<>"']/g, (m) => ({
-      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
-    }[m]));
+  function isReadingActive(){
+    return document.body.classList.contains("reader-open")
+      && document.visibilityState === "visible"
+      && !!currentItem;
   }
 
-  function showError(message) {
-    elError.style.display = "block";
-    elError.innerHTML = escapeHtml(message).replace(/\n/g, "<br>");
+  function nowMs(){
+    // performance.now() est monotone (ne saute pas si l'horloge système change)
+    return (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
   }
 
-  function clearError() {
-    elError.style.display = "none";
-    elError.textContent = "";
-  }
-
-  function showReader() {
-    elCatalogo.style.display = "none";
-    elLeitor.style.display = "block";
-    document.body.classList.add("reader-open");
-  }
-
-  function showCatalog() {
-    elLeitor.style.display = "none";
-    elCatalogo.style.display = "block";
-    document.body.classList.remove("reader-open");
-  }
-
-  function showSavedBadge() {
-    if (!elSaveBadge) return;
-    elSaveBadge.classList.add("show");
-    if (saveBadgeTimer) clearTimeout(saveBadgeTimer);
-    saveBadgeTimer = setTimeout(() => elSaveBadge.classList.remove("show"), 1400);
-  }
-
-  function storageKeyForBook(item) {
-    return "pos:" + (item && item.id ? item.id : "unknown");
-  }
-  function timeKeyForBook(item) {
-    return "time:" + (item && item.id ? item.id : "unknown");
-  }
-  function locKeyForBook(item){
-    return "loc:" + (item && item.id ? item.id : "unknown");
-  }
-
-  function savePosition(item, location) {
-    try {
-      const cfi = location && location.start && location.start.cfi;
-      if (!cfi) return;
-      localStorage.setItem(storageKeyForBook(item), cfi);
-      showSavedBadge();
-    } catch(e) {}
-  }
-
-  function loadPosition(item) {
-    try { return localStorage.getItem(storageKeyForBook(item)); }
-    catch(e){ return null; }
-  }
-
-  function clearPosition(item) {
-    try { localStorage.removeItem(storageKeyForBook(item)); }
-    catch(e){}
-  }
-
-  async function ensureLocations(item){
-    if (!book || !book.locations) return false;
-
-    try {
-      if (book.ready) await book.ready;
-
-      if (typeof book.locations.length === "function" && book.locations.length() > 0) return true;
-
-      const saved = localStorage.getItem(locKeyForBook(item));
-      if (saved) {
-        book.locations.load(saved);
-        if (book.locations.length() > 0) return true;
-      }
-
-      await book.locations.generate(1024);
-
-      try {
-        localStorage.setItem(locKeyForBook(item), book.locations.save());
-      } catch(e) {}
-
-      return (typeof book.locations.length === "function" && book.locations.length() > 0);
-    } catch(e) {
-      return false;
-    }
-  }
-
-  function percentFromLocation(location){
-    const displayed = location && location.start && location.start.displayed;
-
-    const p = location && location.start && location.start.percentage;
-    if (typeof p === "number" && isFinite(p)) {
-      const pp = Math.max(0, Math.min(1, p));
-      if (displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99) {
-        // ignore degenerate
-      } else {
-        return pp;
-      }
-    }
-
-    const cfi = location && location.start && location.start.cfi;
-    if (!cfi || !book || !book.locations || typeof book.locations.length !== "function") return null;
-    if (book.locations.length() === 0) return null;
-
-    if (typeof book.locations.percentageFromCfi === "function") {
-      const px = book.locations.percentageFromCfi(cfi);
-      if (typeof px === "number" && isFinite(px)) {
-        const pp = Math.max(0, Math.min(1, px));
-        if (displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99) {
-          return null;
-        }
-        return pp;
-      }
-    }
-
-    return null;
-  }
-
-  // ====== TIMER HELPERS (setTimeout loop) ======
   function loadReadingTime(item){
     try {
       const v = Number(localStorage.getItem(timeKeyForBook(item)) || 0);
@@ -480,32 +369,78 @@ body.reader-open .footer{display:none}
     elTimePill.textContent = `Tempo: ${formatTime(readingSeconds)}`;
   }
 
-  function stopReadingTimer(){
-    if (readingTimeoutId) clearTimeout(readingTimeoutId);
-    readingTimeoutId = null;
+  function syncActiveState(){
+    const active = isReadingActive();
+    const t = nowMs();
+
+    if (active && activeStartMs === null) {
+      // on démarre une session active
+      activeStartMs = t;
+      return;
+    }
+
+    if (!active && activeStartMs !== null) {
+      // on ferme une session active -> on stocke le delta dans le carry
+      activeCarryMs += (t - activeStartMs);
+      activeStartMs = null;
+    }
   }
 
-  function scheduleNextTick(){
-    stopReadingTimer();
-    readingTimeoutId = setTimeout(() => {
-      // re-check conditions at each tick
-      const readerOpen = document.body.classList.contains("reader-open");
-      const visible = (document.visibilityState === "visible");
-      if (readerOpen && visible && currentItem) {
-        readingSeconds += 30;
-        saveReadingTime(currentItem);
-        updateTimeUI();
-      }
-      scheduleNextTick(); // loop
-    }, 30000);
+  function commitActiveTime(){
+    // calcule combien de temps actif s'est écoulé depuis le dernier commit
+    const t = nowMs();
+
+    if (activeStartMs !== null) {
+      activeCarryMs += (t - activeStartMs);
+      activeStartMs = t;
+    }
+
+    // Convertit en tranches de 30s
+    const chunkMs = 30000;
+    const chunks = Math.floor(activeCarryMs / chunkMs);
+
+    if (chunks > 0) {
+      readingSeconds += chunks * 30;
+      activeCarryMs -= chunks * chunkMs;
+      if (currentItem) saveReadingTime(currentItem);
+      updateTimeUI();
+    }
   }
 
   function startReadingTimer(){
-    updateTimeUI();      // immediate UI refresh
-    scheduleNextTick();  // start loop
+    stopReadingTimer();
+    activeStartMs = null;
+    activeCarryMs = 0;
+
+    syncActiveState();
+    updateTimeUI();
+
+    // tick régulier pour gérer throttling/suspension : on mesure, on ne “compte” pas
+    readingTickId = setInterval(() => {
+      syncActiveState();
+      commitActiveTime();
+    }, 1000);
   }
 
+  function stopReadingTimer(){
+    if (readingTickId) clearInterval(readingTickId);
+    readingTickId = null;
+
+    // On commit ce qui reste (si on quitte le lecteur)
+    syncActiveState();
+    commitActiveTime();
+
+    activeStartMs = null;
+    activeCarryMs = 0;
+  }
+
+  // Quand l'onglet change de visibilité, on synchronise tout de suite
   document.addEventListener("visibilitychange", () => {
+    syncActiveState();
+    commitActiveTime();
+    updateTimeUI();
+  });
+
     updateTimeUI();
   });
 
@@ -718,3 +653,4 @@ body.reader-open .footer{display:none}
 
 </body>
 </html>
+
