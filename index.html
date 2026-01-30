@@ -88,6 +88,11 @@ header strong{font-size:16px;letter-spacing:.2px}
   color:var(--accentfg);
 }
 
+.btn[disabled]{
+  opacity:.55;
+  cursor:not-allowed;
+}
+
 main{
   max-width:980px;
   margin:18px auto;
@@ -143,7 +148,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   border-radius:var(--radius);
   overflow:hidden;
   background:var(--bg);
-  position:relative; /* pour bouton escamotable */
+  position:relative;
 }
 
 .viewer-toolbar{
@@ -154,6 +159,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   padding:10px;
   border-bottom:1px solid var(--border);
   background:var(--card);
+  flex-wrap:wrap;
 }
 
 .viewer-left,.viewer-right{
@@ -163,13 +169,15 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   min-width: 180px;
 }
 .viewer-left{justify-content:flex-start}
-.viewer-right{justify-content:flex-end}
+.viewer-right{justify-content:flex-end; flex:1}
 
 .viewer-center{
   display:flex;
   align-items:center;
   gap:10px;
   justify-content:center;
+  flex:1;
+  min-width: 240px;
 }
 
 .viewer-hint{
@@ -205,7 +213,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
 
 #viewer{
   width:100%;
-  height: calc(100vh - 230px);
+  height: calc(100vh - 260px);
   background:var(--bg);
 }
 
@@ -228,12 +236,8 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   transform:translateY(-2px);
   transition:opacity .18s ease, transform .18s ease;
 }
-.fullscreen-exit.show{
-  opacity:1;
-  transform:translateY(0);
-}
+.fullscreen-exit.show{opacity:1;transform:translateY(0)}
 
-/* Quand la zone .viewer est en plein écran */
 .viewer:fullscreen{
   border-radius:0;
   border:0;
@@ -242,7 +246,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   background:var(--bg);
 }
 .viewer:fullscreen #viewer{
-  height: calc(100vh - 56px); /* toolbar ~56px */
+  height: calc(100vh - 56px);
 }
 .viewer:fullscreen .fullscreen-exit{
   display:inline-flex;
@@ -250,7 +254,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   gap:8px;
 }
 
-/* Optionnel: masque la marge/ombre du card si tu fullscreen depuis .viewer */
+/* Masquage chrome en plein écran */
 body.fs header{display:none}
 body.fs main{margin:0; padding:0}
 body.fs .card{border-radius:0; box-shadow:none; margin:0; padding:0; border:0}
@@ -321,13 +325,20 @@ body.reader-open .footer{display:none}
         </div>
 
         <div class="viewer-right">
+          <!-- Layout controls (nouveau lot) -->
+          <button class="btn" id="flowBtn" type="button" aria-label="Alternar modo de leitura">📄</button>
+          <button class="btn" id="spreadBtn" type="button" aria-label="Alternar colunas">Colunas</button>
+          <button class="btn" id="marginBtn" type="button" aria-label="Ajustar margens">Margens</button>
+          <button class="btn" id="widthBtn" type="button" aria-label="Ajustar largura do texto">Largura</button>
+          <button class="btn" id="justifyBtn" type="button" aria-label="Justificação">J</button>
+          <button class="btn" id="hyphenBtn" type="button" aria-label="Hifenização">Hy</button>
+
           <span class="pill" id="timePill" aria-label="Tempo de leitura">Tempo: 00:00</span>
           <span class="save-badge" id="saveBadge" aria-live="polite">Última leitura salva ✅</span>
           <button class="btn" id="nextBtn" type="button" aria-label="Próxima página">→</button>
         </div>
       </div>
 
-      <!-- bouton escamotable (visible uniquement en plein écran) -->
       <button class="fullscreen-exit" id="fsExitBtn" type="button" aria-label="Sair da tela cheia">⤫ Sair</button>
 
       <div id="viewer" aria-label="Área de leitura"></div>
@@ -376,6 +387,14 @@ body.reader-open .footer{display:none}
   const btnFs = document.getElementById("fsBtn");
   const btnFsExit = document.getElementById("fsExitBtn");
 
+  // Layout controls (nouveau lot)
+  const btnFlow   = document.getElementById("flowBtn");
+  const btnSpread = document.getElementById("spreadBtn");
+  const btnMargin = document.getElementById("marginBtn");
+  const btnWidth  = document.getElementById("widthBtn");
+  const btnJustify= document.getElementById("justifyBtn");
+  const btnHyphen = document.getElementById("hyphenBtn");
+
   // ====== STATE ======
   let book = null;
   let rendition = null;
@@ -390,12 +409,26 @@ body.reader-open .footer{display:none}
   // Progress %: locations readiness
   let locReadyPromise = Promise.resolve(false);
 
+  // ====== Layout prefs (persistées) ======
+  let flowMode  = localStorage.getItem("flowMode") || "paginated"; // "paginated" | "scrolled"
+  let spreadMode= localStorage.getItem("spreadMode") || "none";     // "none" | "auto" (only paginated)
+  let marginPx  = Number(localStorage.getItem("marginPx") || 18);   // 12/18/24/30
+  let maxWidthCh= Number(localStorage.getItem("maxWidthCh") || 72); // 0 = full
+  let justifyOn = (localStorage.getItem("justifyOn") || "0") === "1";
+  let hyphenOn  = (localStorage.getItem("hyphenOn") || "1") === "1";
+  let columnGap = Number(localStorage.getItem("columnGap") || 28);  // paginated only (px)
+
+  // Cycles
+  const MARGIN_STEPS = [12,18,24,30];
+  const WIDTH_STEPS  = [0,60,72,84]; // 0 = full
+  const GAP_STEPS    = [18,28,38];
+
   // ====== TIMER (rAF robuste, tranches 30s) ======
-  let readingSeconds = 0;       // sauvegardé (multiple de 30)
-  let rafId = null;             // requestAnimationFrame id
-  let lastTs = null;            // dernier timestamp rAF
-  let carryMs = 0;              // ms actifs accumulés non convertis
-  const CHUNK_MS = 30000;       // 30 sec
+  let readingSeconds = 0;
+  let rafId = null;
+  let lastTs = null;
+  let carryMs = 0;
+  const CHUNK_MS = 30000;
 
   // ====== UTIL ======
   function escapeHtml(value) {
@@ -434,15 +467,9 @@ body.reader-open .footer{display:none}
   }
 
   // ====== STORAGE KEYS ======
-  function storageKeyForBook(item) {
-    return "pos:" + (item && item.id ? item.id : "unknown");
-  }
-  function timeKeyForBook(item) {
-    return "time:" + (item && item.id ? item.id : "unknown");
-  }
-  function locKeyForBook(item){
-    return "loc:" + (item && item.id ? item.id : "unknown");
-  }
+  function storageKeyForBook(item) { return "pos:" + (item && item.id ? item.id : "unknown"); }
+  function timeKeyForBook(item)    { return "time:" + (item && item.id ? item.id : "unknown"); }
+  function locKeyForBook(item)     { return "loc:" + (item && item.id ? item.id : "unknown"); }
 
   // ====== POSITION SAVE/LOAD (CFI) ======
   function savePosition(item, location) {
@@ -451,7 +478,7 @@ body.reader-open .footer{display:none}
       if (!cfi) return;
       localStorage.setItem(storageKeyForBook(item), cfi);
       showSavedBadge();
-    } catch(e) { /* ignore */ }
+    } catch(e) {}
   }
 
   function loadPosition(item) {
@@ -461,7 +488,7 @@ body.reader-open .footer{display:none}
 
   function clearPosition(item) {
     try { localStorage.removeItem(storageKeyForBook(item)); }
-    catch(e){ /* ignore */ }
+    catch(e){}
   }
 
   // ====== LOCATIONS (for % progress) ======
@@ -481,9 +508,8 @@ body.reader-open .footer{display:none}
 
       await book.locations.generate(1024);
 
-      try {
-        localStorage.setItem(locKeyForBook(item), book.locations.save());
-      } catch(e) { /* ignore quota */ }
+      try { localStorage.setItem(locKeyForBook(item), book.locations.save()); }
+      catch(e) {}
 
       return (typeof book.locations.length === "function" && book.locations.length() > 0);
     } catch(e) {
@@ -512,13 +538,10 @@ body.reader-open .footer{display:none}
       const px = book.locations.percentageFromCfi(cfi);
       if (typeof px === "number" && isFinite(px)) {
         const pp = Math.max(0, Math.min(1, px));
-        if (displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99) {
-          return null;
-        }
+        if (displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99) return null;
         return pp;
       }
     }
-
     return null;
   }
 
@@ -539,9 +562,8 @@ body.reader-open .footer{display:none}
   }
 
   function saveReadingTime(item){
-    try {
-      localStorage.setItem(timeKeyForBook(item), String(readingSeconds));
-    } catch(e){ /* ignore */ }
+    try { localStorage.setItem(timeKeyForBook(item), String(readingSeconds)); }
+    catch(e){}
   }
 
   function formatTime(sec){
@@ -573,7 +595,7 @@ body.reader-open .footer{display:none}
     lastTs = ts;
 
     if (!Number.isFinite(dt) || dt < 0) dt = 0;
-    if (dt > 5000) dt = 0; // garde-fou (suspension/throttling)
+    if (dt > 5000) dt = 0;
 
     if (isReadingActive()) {
       carryMs += dt;
@@ -594,15 +616,13 @@ body.reader-open .footer{display:none}
   function stopReadingTimer(){
     if (rafId) cancelAnimationFrame(rafId);
     rafId = null;
-
     commitChunks();
-
     carryMs = 0;
     lastTs = null;
   }
 
   document.addEventListener("visibilitychange", () => {
-    lastTs = null; // évite dt énorme au retour
+    lastTs = null;
     updateTimeUI();
   });
 
@@ -616,7 +636,125 @@ body.reader-open .footer{display:none}
     try {
       rendition.themes.fontSize(fontPct + "%");
       localStorage.setItem("fontPct", String(fontPct));
-    } catch(e) { /* ignore */ }
+    } catch(e) {}
+  }
+
+  // ====== LAYOUT PREFS (nouveau lot) ======
+  function persistLayoutPrefs(){
+    try {
+      localStorage.setItem("flowMode", flowMode);
+      localStorage.setItem("spreadMode", spreadMode);
+      localStorage.setItem("marginPx", String(marginPx));
+      localStorage.setItem("maxWidthCh", String(maxWidthCh));
+      localStorage.setItem("justifyOn", justifyOn ? "1" : "0");
+      localStorage.setItem("hyphenOn",  hyphenOn ? "1" : "0");
+      localStorage.setItem("columnGap", String(columnGap));
+    } catch(e){}
+  }
+
+  function applyLayoutPrefs(){
+    if (!rendition) return;
+
+    // Flow (pagination vs scroll)
+    try { rendition.flow(flowMode); } catch(e) {}
+
+    // Spread / colonnes (paginated only)
+    const effectiveSpread = (flowMode === "paginated") ? spreadMode : "none";
+    try { rendition.spread(effectiveSpread); } catch(e) {}
+
+    // Marges (padding interne)
+    const pad = `${marginPx}px ${marginPx}px ${marginPx + 6}px ${marginPx}px`;
+    try {
+      rendition.themes.override("body", "padding", pad);
+      rendition.themes.override("body", "margin", "0");
+      rendition.themes.override("html", "margin", "0");
+    } catch(e){}
+
+    // Largeur de ligne (confort typographique)
+    if (maxWidthCh && maxWidthCh > 0) {
+      try {
+        rendition.themes.override("body", "max-width", `${maxWidthCh}ch`);
+        rendition.themes.override("body", "margin-left", "auto");
+        rendition.themes.override("body", "margin-right", "auto");
+      } catch(e){}
+    } else {
+      try {
+        rendition.themes.override("body", "max-width", "none");
+        rendition.themes.override("body", "margin-left", "0");
+        rendition.themes.override("body", "margin-right", "0");
+      } catch(e){}
+    }
+
+    // Colonnes (gap) : utile surtout en paginated
+    try {
+      rendition.themes.override("body", "column-gap", `${columnGap}px`);
+    } catch(e){}
+
+    // Justification
+    try {
+      rendition.themes.override("p", "text-align", justifyOn ? "justify" : "start");
+      rendition.themes.override("li", "text-align", justifyOn ? "justify" : "start");
+      rendition.themes.override("blockquote", "text-align", justifyOn ? "justify" : "start");
+    } catch(e){}
+
+    // Hifenização / coupure de mots
+    // NB : dépend du support navigateur + du lang correct dans l'EPUB,
+    // mais ça marche déjà très bien sur beaucoup de contenus.
+    const hy = hyphenOn ? "auto" : "manual";
+    try {
+      rendition.themes.override("html", "hyphens", hy);
+      rendition.themes.override("html", "-webkit-hyphens", hy);
+      rendition.themes.override("body", "hyphens", hy);
+      rendition.themes.override("body", "-webkit-hyphens", hy);
+
+      // Pour éviter des trous monstrueux en justification
+      rendition.themes.override("body", "word-break", "normal");
+      rendition.themes.override("body", "overflow-wrap", "break-word");
+
+      // Bonus: un peu plus stable sur certains EPUB
+      rendition.themes.override("p", "hyphens", hy);
+      rendition.themes.override("p", "-webkit-hyphens", hy);
+    } catch(e){}
+
+    persistLayoutPrefs();
+    syncLayoutButtons();
+  }
+
+  function labelFlow(){
+    return (flowMode === "paginated") ? "📄" : "📜";
+  }
+  function labelSpread(){
+    return (spreadMode === "auto") ? "2 col" : "1 col";
+  }
+  function labelMargin(){
+    return `M ${marginPx}`;
+  }
+  function labelWidth(){
+    return (maxWidthCh && maxWidthCh > 0) ? `${maxWidthCh}ch` : "Tela";
+  }
+  function labelJustify(){
+    return justifyOn ? "J✓" : "J";
+  }
+  function labelHyphen(){
+    return hyphenOn ? "Hy✓" : "Hy";
+  }
+
+  function syncLayoutButtons(){
+    if (btnFlow)   { btnFlow.textContent = labelFlow();   btnFlow.title = (flowMode==="paginated") ? "Paginação" : "Rolagem"; }
+    if (btnSpread) {
+      btnSpread.textContent = `Col ${labelSpread()}`;
+      btnSpread.disabled = (flowMode !== "paginated");
+      btnSpread.title = btnSpread.disabled ? "Colunas (só na paginação)" : "Alternar colunas";
+    }
+    if (btnMargin) { btnMargin.textContent = labelMargin(); btnMargin.title = "Margens"; }
+    if (btnWidth)  { btnWidth.textContent = `L ${labelWidth()}`; btnWidth.title = "Largura do texto"; }
+    if (btnJustify){ btnJustify.textContent = labelJustify(); btnJustify.title = justifyOn ? "Justificação ON" : "Justificação OFF"; }
+    if (btnHyphen) { btnHyphen.textContent = labelHyphen(); btnHyphen.title = hyphenOn ? "Hifenização ON" : "Hifenização OFF"; }
+  }
+
+  function cycleValue(list, current){
+    const i = list.indexOf(current);
+    return list[(i >= 0 ? i + 1 : 0) % list.length];
   }
 
   // ====== THEME ======
@@ -639,13 +777,8 @@ body.reader-open .footer{display:none}
 
     rendition.themes.select("app");
 
-    try {
-      rendition.themes.override("body", "padding", "18px 18px 24px 18px");
-      rendition.themes.override("body", "margin", "0");
-      rendition.themes.override("html", "margin", "0");
-    } catch(e) { /* ignore */ }
-
     applyReadingPrefs();
+    applyLayoutPrefs();
   }
 
   function setTheme(isNight) {
@@ -711,37 +844,23 @@ body.reader-open .footer{display:none}
   }
 
   // ====== FULLSCREEN ======
-  function isFullscreen(){
-    return !!document.fullscreenElement;
-  }
+  function isFullscreen(){ return !!document.fullscreenElement; }
 
   function showFsExitTemporarily(){
     if (!btnFsExit) return;
     btnFsExit.classList.add("show");
-    // cache après un délai
     clearTimeout(showFsExitTemporarily._t);
-    showFsExitTemporarily._t = setTimeout(() => {
-      btnFsExit.classList.remove("show");
-    }, 1800);
+    showFsExitTemporarily._t = setTimeout(() => btnFsExit.classList.remove("show"), 1800);
   }
 
   async function enterFullscreen(){
     if (!viewerShell) return;
     if (!document.fullscreenEnabled) return;
-
-    try{
-      await viewerShell.requestFullscreen();
-    } catch(e){
-      // ignore
-    }
+    try{ await viewerShell.requestFullscreen(); } catch(e){}
   }
 
   async function exitFullscreen(){
-    try{
-      if (document.fullscreenElement) await document.exitFullscreen();
-    } catch(e){
-      // ignore
-    }
+    try{ if (document.fullscreenElement) await document.exitFullscreen(); } catch(e){}
   }
 
   function toggleFullscreen(){
@@ -758,14 +877,10 @@ body.reader-open .footer{display:none}
     else if (btnFsExit) btnFsExit.classList.remove("show");
   });
 
-  // ESC déjà géré nativement par le navigateur, mais on “sécurise”
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && isFullscreen()) {
-      exitFullscreen();
-    }
+    if (e.key === "Escape" && isFullscreen()) exitFullscreen();
   });
 
-  // bouton escamotable: réapparaît au mouvement
   ["mousemove","touchstart","click"].forEach(evt => {
     viewerShell && viewerShell.addEventListener(evt, () => {
       if (isFullscreen()) showFsExitTemporarily();
@@ -814,7 +929,6 @@ body.reader-open .footer{display:none}
 
       book = window.ePub(arrayBuffer);
 
-      // prepare locations for % progress (wait for book.ready, cache)
       locReadyPromise = (book.ready ? book.ready.then(() => ensureLocations(item)) : ensureLocations(item));
 
       rendition = book.renderTo("viewer", {
@@ -823,9 +937,14 @@ body.reader-open .footer{display:none}
         spread: "none"
       });
 
+      // Apply theme + prefs after each rendered
+      rendition.on("rendered", () => applyThemeToRendition());
+
+      // Nav buttons
       btnPrev.onclick = () => rendition && rendition.prev();
       btnNext.onclick = () => rendition && rendition.next();
 
+      // Restart
       btnRestart.onclick = async () => {
         if (!currentItem || !rendition) return;
         clearPosition(currentItem);
@@ -833,6 +952,7 @@ body.reader-open .footer{display:none}
         try { await rendition.display(); } catch(e) {}
       };
 
+      // Font
       btnFontMinus.onclick = () => {
         fontPct = Math.max(80, fontPct - 10);
         applyReadingPrefs();
@@ -842,27 +962,61 @@ body.reader-open .footer{display:none}
         applyReadingPrefs();
       };
 
+      // Layout controls events
+      if (btnFlow) btnFlow.onclick = () => {
+        flowMode = (flowMode === "paginated") ? "scrolled" : "paginated";
+        applyLayoutPrefs();
+        // rafraîchit l'affichage après changement de flow
+        try { rendition && rendition.resize(); } catch(e) {}
+      };
+
+      if (btnSpread) btnSpread.onclick = () => {
+        // only meaningful in paginated
+        spreadMode = (spreadMode === "auto") ? "none" : "auto";
+        applyLayoutPrefs();
+        try { rendition && rendition.resize(); } catch(e) {}
+      };
+
+      if (btnMargin) btnMargin.onclick = () => {
+        marginPx = cycleValue(MARGIN_STEPS, marginPx);
+        applyLayoutPrefs();
+      };
+
+      if (btnWidth) btnWidth.onclick = () => {
+        maxWidthCh = cycleValue(WIDTH_STEPS, maxWidthCh);
+        applyLayoutPrefs();
+      };
+
+      if (btnJustify) btnJustify.onclick = () => {
+        justifyOn = !justifyOn;
+        applyLayoutPrefs();
+      };
+
+      if (btnHyphen) btnHyphen.onclick = () => {
+        hyphenOn = !hyphenOn;
+        applyLayoutPrefs();
+      };
+
+      // Save position + progress
       rendition.on("relocated", (location) => {
         savePosition(item, location);
         updateProgressUI(location);
       });
 
-      rendition.on("rendered", () => applyThemeToRendition());
+      // Display (resume if possible)
+      if (savedCfi) await rendition.display(savedCfi);
+      else await rendition.display();
 
-      if (savedCfi) {
-        await rendition.display(savedCfi);
-      } else {
-        await rendition.display();
-      }
-
+      // Apply all (theme + prefs)
       applyThemeToRendition();
+      syncLayoutButtons();
 
       // Ensure locations ready then force a first % update
       try {
         await locReadyPromise;
         const loc = rendition && rendition.currentLocation ? rendition.currentLocation() : null;
         if (loc) updateProgressUI(loc);
-      } catch(e) { /* ignore */ }
+      } catch(e) {}
 
     } catch (err) {
       console.error(err);
@@ -877,7 +1031,6 @@ body.reader-open .footer{display:none}
   btnBack.addEventListener("click", async () => {
     clearError();
     stopReadingTimer();
-    // si on revient au catalogue, on sort du fullscreen
     if (isFullscreen()) await exitFullscreen();
     showCatalog();
   });
@@ -886,7 +1039,13 @@ body.reader-open .footer{display:none}
   if (btnFs) btnFs.addEventListener("click", toggleFullscreen);
   if (btnFsExit) btnFsExit.addEventListener("click", exitFullscreen);
 
+  // Theme init
   initTheme();
+
+  // Initial labels (avant ouverture livre)
+  syncLayoutButtons();
+
+  // Catalog init
   renderCatalog();
 })();
 </script>
