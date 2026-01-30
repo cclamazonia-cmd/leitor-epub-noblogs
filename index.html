@@ -266,45 +266,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   background:var(--bg);
 }
 
-/* =========================================================
-   FIX : scroll vertical dès la cover en mode scrolled-doc
-   (forcer le scroll sur les conteneurs internes epub.js)
-   ========================================================= */
-
-/* 1) En scroll: on donne un “cadre” stable */
-body.flow-scroll #viewer{
-  overflow:hidden; /* IMPORTANT: le scroll se fait sur .epub-container */
-  -webkit-overflow-scrolling:touch;
-}
-
-/* 2) Conteneurs epub.js: ils doivent pouvoir scroller */
-body.flow-scroll #viewer .epub-container,
-body.flow-scroll #viewer .epub-view{
-  height:100% !important;
-}
-
-/* Le vrai scroller (souvent .epub-container) */
-body.flow-scroll #viewer .epub-container{
-  overflow-y:auto !important;
-  overflow-x:hidden !important;
-  -webkit-overflow-scrolling:touch;
-}
-
-/* 3) Iframes: éviter qu’ils “cassent” le flux */
-body.flow-scroll #viewer iframe{
-  width:100% !important;
-  display:block;
-}
-
-/* 4) En paginated: pas de scroll parasite */
-body.flow-pages #viewer{
-  overflow:hidden;
-}
-body.flow-pages #viewer .epub-container{
-  overflow:hidden !important;
-}
-
-/* Masquer les flèches en mode scroll */
+/* Scroll: épingles UI */
 body.flow-scroll #prevBtn,
 body.flow-scroll #nextBtn{
   display:none;
@@ -485,9 +447,6 @@ body.reader-open .footer{display:none}
 
   // Hook lang (par rendition)
   let langHookInstalled = false;
-
-  // Anti-bloquage sur la couverture (en scroll) : une seule fois par ouverture
-  let coverEscapedOnce = false;
 
   // ====== TIMER ======
   let readingSeconds = 0;
@@ -672,7 +631,7 @@ body.reader-open .footer{display:none}
   }
 
   function stopReadingTimer(){
-    if (rafId) cancelAnimationFrame(rafLoop);
+    if (rafId) cancelAnimationFrame(rafId);
     rafId = null;
     commitChunks();
     carryMs = 0;
@@ -929,55 +888,17 @@ body.reader-open .footer{display:none}
     elProgress.textContent = pagePart + pctPart;
   }
 
-  // ====== REPRISE "future-proof" ======
+  // ====== COVER DETECTION ======
   function looksLikeCoverHref(href){
     const h = String(href || "").toLowerCase();
     return h.includes("cover") || h.includes("titlepage") || h.includes("capa");
   }
 
-  async function displayFromTOCOrSpine(){
-    // 1) TOC (nav)
-    try {
-      if (book && book.navigation && Array.isArray(book.navigation.toc) && book.navigation.toc.length) {
-        const toc = book.navigation.toc;
-        const firstGood = toc.find(t => t && t.href && !looksLikeCoverHref(t.href)) || toc.find(t => t && t.href) || null;
-        if (firstGood && firstGood.href) {
-          await rendition.display(firstGood.href);
-          return true;
-        }
-      }
-    } catch(e) {}
-
-    // 2) spine: premier item linear "yes" non-cover
-    try {
-      const items = book && book.spine && book.spine.items ? book.spine.items : null;
-      if (items && items.length) {
-        for (const it of items) {
-          const linear = String(it.linear || "yes").toLowerCase();
-          if (linear === "no") continue;
-          const href = it.href || "";
-          if (!href) continue;
-          if (looksLikeCoverHref(href)) continue;
-          try {
-            await rendition.display(href);
-            return true;
-          } catch(e){}
-        }
-      }
-    } catch(e) {}
-
-    // 3) fallback epub.js
-    try { await rendition.display(); return true; } catch(e) {}
-    return false;
-  }
-
-  // ====== ANTI-BLOCAGE COVER EN SCROLL ======
   function isCoverSpineItem(it){
     if (!it) return false;
     const href = String(it.href || "").toLowerCase();
     const id = String(it.idref || it.id || "").toLowerCase();
     const props = String(it.properties || "").toLowerCase();
-
     if (props.includes("cover")) return true;
     if (href.includes("cover") || href.includes("titlepage") || href.includes("capa")) return true;
     if (id.includes("cover") || id.includes("titlepage")) return true;
@@ -995,23 +916,111 @@ body.reader-open .footer{display:none}
     return false;
   }
 
-  async function escapeCoverIfNeeded(){
+  // ====== COVER SCROLL BRIDGE (FIX) ======
+  let coverBridgeInstalled = false;
+  let coverBridgeCooldown = false;
+  let touchStartY = null;
+
+  function canBridgeNow(){
     if (!rendition || !book) return false;
     if (flowMode !== "scrolled-doc") return false;
-    if (coverEscapedOnce) return false;
-
     let loc = null;
     try { loc = rendition.currentLocation && rendition.currentLocation(); } catch(e){}
-    if (!locationLooksLikeCover(loc)) return false;
+    return locationLooksLikeCover(loc);
+  }
 
-    coverEscapedOnce = true;
+  function bridgeNext(){
+    if (!rendition) return;
+    if (coverBridgeCooldown) return;
+    coverBridgeCooldown = true;
+    setTimeout(() => { coverBridgeCooldown = false; }, 280);
+    try { rendition.next(); } catch(e){}
+  }
 
+  function bridgePrev(){
+    if (!rendition) return;
+    if (coverBridgeCooldown) return;
+    coverBridgeCooldown = true;
+    setTimeout(() => { coverBridgeCooldown = false; }, 280);
+    try { rendition.prev(); } catch(e){}
+  }
+
+  function installCoverBridge(){
+    if (coverBridgeInstalled) return;
+    if (!viewerShell) return;
+    coverBridgeInstalled = true;
+
+    // Wheel / trackpad
+    viewerShell.addEventListener("wheel", (e) => {
+      if (!canBridgeNow()) return;
+      const dy = e.deltaY || 0;
+      if (Math.abs(dy) < 4) return;
+      e.preventDefault();
+      if (dy > 0) bridgeNext();
+      else bridgePrev();
+    }, {passive:false});
+
+    // Touch (mobile)
+    viewerShell.addEventListener("touchstart", (e) => {
+      if (!canBridgeNow()) return;
+      const t = e.touches && e.touches[0];
+      if (!t) return;
+      touchStartY = t.clientY;
+    }, {passive:true});
+
+    viewerShell.addEventListener("touchmove", (e) => {
+      if (!canBridgeNow()) return;
+      // empêcher le "scroll mort" sur la cover
+      e.preventDefault();
+    }, {passive:false});
+
+    viewerShell.addEventListener("touchend", (e) => {
+      if (!canBridgeNow()) { touchStartY = null; return; }
+      if (touchStartY === null) return;
+      const t = (e.changedTouches && e.changedTouches[0]) || null;
+      if (!t) { touchStartY = null; return; }
+      const dy = touchStartY - t.clientY;
+      touchStartY = null;
+      if (Math.abs(dy) < 26) return;
+      if (dy > 0) bridgeNext();
+      else bridgePrev();
+    }, {passive:true});
+  }
+
+  // ====== REPRISE "future-proof" ======
+  async function displayFromTOCOrSpine(){
+    // 1) TOC (nav)
     try {
-      await displayFromTOCOrSpine();
-      await applyFlowMode(true);
-    } catch(e){}
+      if (book && book.navigation && Array.isArray(book.navigation.toc) && book.navigation.toc.length) {
+        const toc = book.navigation.toc;
+        const firstGood = toc.find(t => t && t.href) || null;
+        if (firstGood && firstGood.href) {
+          await rendition.display(firstGood.href);
+          return true;
+        }
+      }
+    } catch(e) {}
 
-    return true;
+    // 2) spine: premier item linear "yes"
+    try {
+      const items = book && book.spine && book.spine.items ? book.spine.items : null;
+      if (items && items.length) {
+        for (const it of items) {
+          const linear = String(it.linear || "yes").toLowerCase();
+          if (linear === "no") continue;
+          const href = it.href || "";
+          if (!href) continue;
+          try {
+            await rendition.display(href);
+            return true;
+          } catch(e){}
+        }
+      }
+    } catch(e) {}
+
+    // 3) fallback epub.js
+    try { await rendition.display(); return true; } catch(e) {}
+    return false;
   }
 
   // ====== EPUB ======
@@ -1050,7 +1059,6 @@ body.reader-open .footer{display:none}
 
       // reset par ouverture
       langHookInstalled = false;
-      coverEscapedOnce = false;
 
       const path = "epubs/" + item.file;
 
@@ -1068,6 +1076,9 @@ body.reader-open .footer{display:none}
         spread: "none"
       });
 
+      // FIX: bridge cover scroll
+      installCoverBridge();
+
       // Applique mode par défaut (scroll) avant 1ère display
       syncModeUI();
       await applyFlowMode(false);
@@ -1082,7 +1093,6 @@ body.reader-open .footer{display:none}
         try { await displayFromTOCOrSpine(); } catch(e){}
         applyThemeToRendition();
         await applyFlowMode(true);
-        await escapeCoverIfNeeded();
       };
 
       btnFontMinus.onclick = () => {
@@ -1099,7 +1109,6 @@ body.reader-open .footer{display:none}
           flowMode = (flowMode === "paginated") ? "scrolled-doc" : "paginated";
           try { localStorage.setItem("flowMode", flowMode); } catch(e){}
           await applyFlowMode(true);
-          await escapeCoverIfNeeded();
         };
       }
 
@@ -1119,7 +1128,6 @@ body.reader-open .footer{display:none}
       rendition.on("relocated", (location) => {
         savePosition(item, location);
         updateProgressUI(location);
-        escapeCoverIfNeeded();
       });
 
       rendition.on("rendered", () => applyThemeToRendition());
@@ -1130,7 +1138,7 @@ body.reader-open .footer{display:none}
           await rendition.display(savedCfi);
         } catch(e) {
           clearPosition(item);
-          showNotice("ℹ️ Posição salva incompatível com a nova versão do EPUB. Abrindo no início do conteúdo…");
+          showNotice("ℹ️ Posição salva incompatível com a nova versão do EPUB. Abrindo no início…");
           await displayFromTOCOrSpine();
         }
       } else {
@@ -1140,11 +1148,10 @@ body.reader-open .footer{display:none}
         }
       }
 
-      // Applique thème + recale flow + anti-cover
+      // Applique thème + recale flow
       applyThemeToRendition();
       syncJustifyHyphenButtons();
       await applyFlowMode(true);
-      await escapeCoverIfNeeded();
 
       // Ensure locations ready then force a first % update
       try {
