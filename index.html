@@ -77,21 +77,13 @@ header strong{font-size:16px;letter-spacing:.2px}
   font-size:14px;
   transition:transform .08s ease, background .15s ease, border-color .15s ease;
   user-select:none;
+  white-space:nowrap;
 }
 .btn:hover{background:color-mix(in srgb, var(--card) 55%, var(--bg))}
 .btn:active{transform:scale(.98)}
 .btn:focus{outline:2px solid color-mix(in srgb, var(--accent) 35%, transparent);outline-offset:2px}
-
-.btn-primary{
-  border-color:transparent;
-  background:var(--accent);
-  color:var(--accentfg);
-}
-
-.btn[disabled]{
-  opacity:.55;
-  cursor:not-allowed;
-}
+.btn-primary{border-color:transparent;background:var(--accent);color:var(--accentfg)}
+.btn[disabled]{opacity:.55;cursor:not-allowed}
 
 main{
   max-width:980px;
@@ -151,6 +143,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   position:relative;
 }
 
+/* ===== Toolbar: desktop ===== */
 .viewer-toolbar{
   display:flex;
   justify-content:space-between;
@@ -159,26 +152,29 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   padding:10px;
   border-bottom:1px solid var(--border);
   background:var(--card);
-  flex-wrap:wrap;
 }
 
-.viewer-left,.viewer-right{
+.viewer-left,.viewer-center,.viewer-right{
   display:flex;
   align-items:center;
   gap:8px;
-  min-width: 180px;
 }
-.viewer-left{justify-content:flex-start}
-.viewer-right{justify-content:flex-end; flex:1}
 
-.viewer-center{
+.viewer-left{justify-content:flex-start}
+.viewer-center{justify-content:center; flex:1; min-width: 240px;}
+.viewer-right{justify-content:flex-end; gap:8px; flex-wrap:wrap;}
+
+/* Groupe des boutons "layout" pour pouvoir wrap proprement */
+.layout-controls{
   display:flex;
   align-items:center;
-  gap:10px;
-  justify-content:center;
-  flex:1;
-  min-width: 240px;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
 }
+
+/* Les pills/badges ne doivent pas casser la ligne */
+.pill,.save-badge{white-space:nowrap}
 
 .viewer-hint{
   color:var(--muted);
@@ -194,7 +190,6 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   border:1px solid var(--border);
   border-radius:999px;
   background:color-mix(in srgb, var(--bg) 70%, var(--card));
-  white-space:nowrap;
 }
 
 .save-badge{
@@ -207,14 +202,51 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   opacity:0;
   transform:translateY(2px);
   transition:opacity .18s ease, transform .18s ease;
-  white-space:nowrap;
 }
 .save-badge.show{opacity:1;transform:translateY(0)}
 
 #viewer{
   width:100%;
-  height: calc(100vh - 260px);
+  height: calc(100vh - 280px);
   background:var(--bg);
+}
+
+/* ===== Responsive toolbar: évite tout chevauchement ===== */
+@media (max-width: 920px){
+  .viewer-toolbar{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "left right"
+      "center center";
+    gap:10px;
+  }
+  .viewer-left{grid-area:left}
+  .viewer-right{grid-area:right}
+  .viewer-center{grid-area:center; justify-content:center; min-width:0}
+  .viewer-hint{min-width:0}
+}
+
+@media (max-width: 620px){
+  .viewer-toolbar{
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "left"
+      "center"
+      "right";
+  }
+  .viewer-left,.viewer-center,.viewer-right{
+    justify-content:space-between;
+  }
+  .layout-controls{
+    justify-content:flex-start;
+  }
+  .viewer-right{
+    gap:10px;
+  }
+  /* Réduit un peu les boutons pour mobile sans casser */
+  .btn{padding:9px 10px; font-size:13px; border-radius:11px}
+  .pill,.save-badge{font-size:11px; padding:5px 8px}
 }
 
 /* ===== Fullscreen UI ===== */
@@ -246,7 +278,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   background:var(--bg);
 }
 .viewer:fullscreen #viewer{
-  height: calc(100vh - 56px);
+  height: calc(100vh - 64px);
 }
 .viewer:fullscreen .fullscreen-exit{
   display:inline-flex;
@@ -325,13 +357,14 @@ body.reader-open .footer{display:none}
         </div>
 
         <div class="viewer-right">
-          <!-- Layout controls (nouveau lot) -->
-          <button class="btn" id="flowBtn" type="button" aria-label="Alternar modo de leitura">📄</button>
-          <button class="btn" id="spreadBtn" type="button" aria-label="Alternar colunas">Colunas</button>
-          <button class="btn" id="marginBtn" type="button" aria-label="Ajustar margens">Margens</button>
-          <button class="btn" id="widthBtn" type="button" aria-label="Ajustar largura do texto">Largura</button>
-          <button class="btn" id="justifyBtn" type="button" aria-label="Justificação">J</button>
-          <button class="btn" id="hyphenBtn" type="button" aria-label="Hifenização">Hy</button>
+          <div class="layout-controls">
+            <button class="btn" id="flowBtn" type="button" aria-label="Alternar modo de leitura">📄</button>
+            <button class="btn" id="spreadBtn" type="button" aria-label="Alternar colunas">Colunas</button>
+            <button class="btn" id="marginBtn" type="button" aria-label="Ajustar margens">Margens</button>
+            <button class="btn" id="widthBtn" type="button" aria-label="Ajustar largura do texto">Largura</button>
+            <button class="btn" id="justifyBtn" type="button" aria-label="Justificação">J</button>
+            <button class="btn" id="hyphenBtn" type="button" aria-label="Hifenização">Hy</button>
+          </div>
 
           <span class="pill" id="timePill" aria-label="Tempo de leitura">Tempo: 00:00</span>
           <span class="save-badge" id="saveBadge" aria-live="polite">Última leitura salva ✅</span>
@@ -340,7 +373,6 @@ body.reader-open .footer{display:none}
       </div>
 
       <button class="fullscreen-exit" id="fsExitBtn" type="button" aria-label="Sair da tela cheia">⤫ Sair</button>
-
       <div id="viewer" aria-label="Área de leitura"></div>
     </div>
 
@@ -387,7 +419,7 @@ body.reader-open .footer{display:none}
   const btnFs = document.getElementById("fsBtn");
   const btnFsExit = document.getElementById("fsExitBtn");
 
-  // Layout controls (nouveau lot)
+  // Layout controls
   const btnFlow   = document.getElementById("flowBtn");
   const btnSpread = document.getElementById("spreadBtn");
   const btnMargin = document.getElementById("marginBtn");
@@ -400,37 +432,30 @@ body.reader-open .footer{display:none}
   let rendition = null;
   let currentItem = null;
 
-  // Font size persisted
   let fontPct = Number(localStorage.getItem("fontPct") || 110);
 
-  // Badge timer
   let saveBadgeTimer = null;
-
-  // Progress %: locations readiness
   let locReadyPromise = Promise.resolve(false);
 
-  // ====== Layout prefs (persistées) ======
-  let flowMode  = localStorage.getItem("flowMode") || "paginated"; // "paginated" | "scrolled"
-  let spreadMode= localStorage.getItem("spreadMode") || "none";     // "none" | "auto" (only paginated)
-  let marginPx  = Number(localStorage.getItem("marginPx") || 18);   // 12/18/24/30
-  let maxWidthCh= Number(localStorage.getItem("maxWidthCh") || 72); // 0 = full
+  // ====== Layout prefs ======
+  let flowMode  = localStorage.getItem("flowMode") || "paginated";
+  let spreadMode= localStorage.getItem("spreadMode") || "none";
+  let marginPx  = Number(localStorage.getItem("marginPx") || 18);
+  let maxWidthCh= Number(localStorage.getItem("maxWidthCh") || 72);
   let justifyOn = (localStorage.getItem("justifyOn") || "0") === "1";
   let hyphenOn  = (localStorage.getItem("hyphenOn") || "1") === "1";
-  let columnGap = Number(localStorage.getItem("columnGap") || 28);  // paginated only (px)
+  let columnGap = Number(localStorage.getItem("columnGap") || 28);
 
-  // Cycles
   const MARGIN_STEPS = [12,18,24,30];
-  const WIDTH_STEPS  = [0,60,72,84]; // 0 = full
-  const GAP_STEPS    = [18,28,38];
+  const WIDTH_STEPS  = [0,60,72,84];
 
-  // ====== TIMER (rAF robuste, tranches 30s) ======
+  // ====== TIMER (rAF) ======
   let readingSeconds = 0;
   let rafId = null;
   let lastTs = null;
   let carryMs = 0;
   const CHUNK_MS = 30000;
 
-  // ====== UTIL ======
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>"']/g, (m) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
@@ -466,12 +491,10 @@ body.reader-open .footer{display:none}
     saveBadgeTimer = setTimeout(() => elSaveBadge.classList.remove("show"), 1400);
   }
 
-  // ====== STORAGE KEYS ======
   function storageKeyForBook(item) { return "pos:" + (item && item.id ? item.id : "unknown"); }
   function timeKeyForBook(item)    { return "time:" + (item && item.id ? item.id : "unknown"); }
   function locKeyForBook(item)     { return "loc:" + (item && item.id ? item.id : "unknown"); }
 
-  // ====== POSITION SAVE/LOAD (CFI) ======
   function savePosition(item, location) {
     try {
       const cfi = location && location.start && location.start.cfi;
@@ -491,13 +514,10 @@ body.reader-open .footer{display:none}
     catch(e){}
   }
 
-  // ====== LOCATIONS (for % progress) ======
   async function ensureLocations(item){
     if (!book || !book.locations) return false;
-
     try {
       if (book.ready) await book.ready;
-
       if (typeof book.locations.length === "function" && book.locations.length() > 0) return true;
 
       const saved = localStorage.getItem(locKeyForBook(item));
@@ -508,9 +528,7 @@ body.reader-open .footer{display:none}
 
       await book.locations.generate(1024);
 
-      try { localStorage.setItem(locKeyForBook(item), book.locations.save()); }
-      catch(e) {}
-
+      try { localStorage.setItem(locKeyForBook(item), book.locations.save()); } catch(e) {}
       return (typeof book.locations.length === "function" && book.locations.length() > 0);
     } catch(e) {
       return false;
@@ -523,9 +541,7 @@ body.reader-open .footer{display:none}
     const p = location && location.start && location.start.percentage;
     if (typeof p === "number" && isFinite(p)) {
       const pp = Math.max(0, Math.min(1, p));
-      if (displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99) {
-        // ignore degenerate
-      } else {
+      if (!(displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99)) {
         return pp;
       }
     }
@@ -538,14 +554,14 @@ body.reader-open .footer{display:none}
       const px = book.locations.percentageFromCfi(cfi);
       if (typeof px === "number" && isFinite(px)) {
         const pp = Math.max(0, Math.min(1, px));
-        if (displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99) return null;
-        return pp;
+        if (!(displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99)) {
+          return pp;
+        }
       }
     }
     return null;
   }
 
-  // ====== TIMER (rAF) ======
   function isReadingActive(){
     return document.body.classList.contains("reader-open")
       && document.visibilityState === "visible"
@@ -562,8 +578,7 @@ body.reader-open .footer{display:none}
   }
 
   function saveReadingTime(item){
-    try { localStorage.setItem(timeKeyForBook(item), String(readingSeconds)); }
-    catch(e){}
+    try { localStorage.setItem(timeKeyForBook(item), String(readingSeconds)); } catch(e){}
   }
 
   function formatTime(sec){
@@ -601,7 +616,6 @@ body.reader-open .footer{display:none}
       carryMs += dt;
       commitChunks();
     }
-
     rafId = requestAnimationFrame(rafLoop);
   }
 
@@ -630,7 +644,6 @@ body.reader-open .footer{display:none}
     if (currentItem) saveReadingTime(currentItem);
   });
 
-  // ====== READING PREFS ======
   function applyReadingPrefs() {
     if (!rendition) return;
     try {
@@ -639,7 +652,6 @@ body.reader-open .footer{display:none}
     } catch(e) {}
   }
 
-  // ====== LAYOUT PREFS (nouveau lot) ======
   function persistLayoutPrefs(){
     try {
       localStorage.setItem("flowMode", flowMode);
@@ -652,95 +664,15 @@ body.reader-open .footer{display:none}
     } catch(e){}
   }
 
-  function applyLayoutPrefs(){
-    if (!rendition) return;
-
-    // Flow (pagination vs scroll)
-    try { rendition.flow(flowMode); } catch(e) {}
-
-    // Spread / colonnes (paginated only)
-    const effectiveSpread = (flowMode === "paginated") ? spreadMode : "none";
-    try { rendition.spread(effectiveSpread); } catch(e) {}
-
-    // Marges (padding interne)
-    const pad = `${marginPx}px ${marginPx}px ${marginPx + 6}px ${marginPx}px`;
-    try {
-      rendition.themes.override("body", "padding", pad);
-      rendition.themes.override("body", "margin", "0");
-      rendition.themes.override("html", "margin", "0");
-    } catch(e){}
-
-    // Largeur de ligne (confort typographique)
-    if (maxWidthCh && maxWidthCh > 0) {
-      try {
-        rendition.themes.override("body", "max-width", `${maxWidthCh}ch`);
-        rendition.themes.override("body", "margin-left", "auto");
-        rendition.themes.override("body", "margin-right", "auto");
-      } catch(e){}
-    } else {
-      try {
-        rendition.themes.override("body", "max-width", "none");
-        rendition.themes.override("body", "margin-left", "0");
-        rendition.themes.override("body", "margin-right", "0");
-      } catch(e){}
-    }
-
-    // Colonnes (gap) : utile surtout en paginated
-    try {
-      rendition.themes.override("body", "column-gap", `${columnGap}px`);
-    } catch(e){}
-
-    // Justification
-    try {
-      rendition.themes.override("p", "text-align", justifyOn ? "justify" : "start");
-      rendition.themes.override("li", "text-align", justifyOn ? "justify" : "start");
-      rendition.themes.override("blockquote", "text-align", justifyOn ? "justify" : "start");
-    } catch(e){}
-
-    // Hifenização / coupure de mots
-    // NB : dépend du support navigateur + du lang correct dans l'EPUB,
-    // mais ça marche déjà très bien sur beaucoup de contenus.
-    const hy = hyphenOn ? "auto" : "manual";
-    try {
-      rendition.themes.override("html", "hyphens", hy);
-      rendition.themes.override("html", "-webkit-hyphens", hy);
-      rendition.themes.override("body", "hyphens", hy);
-      rendition.themes.override("body", "-webkit-hyphens", hy);
-
-      // Pour éviter des trous monstrueux en justification
-      rendition.themes.override("body", "word-break", "normal");
-      rendition.themes.override("body", "overflow-wrap", "break-word");
-
-      // Bonus: un peu plus stable sur certains EPUB
-      rendition.themes.override("p", "hyphens", hy);
-      rendition.themes.override("p", "-webkit-hyphens", hy);
-    } catch(e){}
-
-    persistLayoutPrefs();
-    syncLayoutButtons();
-  }
-
-  function labelFlow(){
-    return (flowMode === "paginated") ? "📄" : "📜";
-  }
-  function labelSpread(){
-    return (spreadMode === "auto") ? "2 col" : "1 col";
-  }
-  function labelMargin(){
-    return `M ${marginPx}`;
-  }
-  function labelWidth(){
-    return (maxWidthCh && maxWidthCh > 0) ? `${maxWidthCh}ch` : "Tela";
-  }
-  function labelJustify(){
-    return justifyOn ? "J✓" : "J";
-  }
-  function labelHyphen(){
-    return hyphenOn ? "Hy✓" : "Hy";
-  }
+  function labelFlow(){ return (flowMode === "paginated") ? "📄" : "📜"; }
+  function labelSpread(){ return (spreadMode === "auto") ? "2 col" : "1 col"; }
+  function labelMargin(){ return `M ${marginPx}`; }
+  function labelWidth(){ return (maxWidthCh && maxWidthCh > 0) ? `${maxWidthCh}ch` : "Tela"; }
+  function labelJustify(){ return justifyOn ? "J✓" : "J"; }
+  function labelHyphen(){ return hyphenOn ? "Hy✓" : "Hy"; }
 
   function syncLayoutButtons(){
-    if (btnFlow)   { btnFlow.textContent = labelFlow();   btnFlow.title = (flowMode==="paginated") ? "Paginação" : "Rolagem"; }
+    if (btnFlow)   { btnFlow.textContent = labelFlow(); btnFlow.title = (flowMode==="paginated") ? "Paginação" : "Rolagem"; }
     if (btnSpread) {
       btnSpread.textContent = `Col ${labelSpread()}`;
       btnSpread.disabled = (flowMode !== "paginated");
@@ -757,7 +689,59 @@ body.reader-open .footer{display:none}
     return list[(i >= 0 ? i + 1 : 0) % list.length];
   }
 
-  // ====== THEME ======
+  function applyLayoutPrefs(){
+    if (!rendition) return;
+
+    try { rendition.flow(flowMode); } catch(e) {}
+
+    const effectiveSpread = (flowMode === "paginated") ? spreadMode : "none";
+    try { rendition.spread(effectiveSpread); } catch(e) {}
+
+    const pad = `${marginPx}px ${marginPx}px ${marginPx + 6}px ${marginPx}px`;
+    try {
+      rendition.themes.override("body", "padding", pad);
+      rendition.themes.override("body", "margin", "0");
+      rendition.themes.override("html", "margin", "0");
+    } catch(e){}
+
+    if (maxWidthCh && maxWidthCh > 0) {
+      try {
+        rendition.themes.override("body", "max-width", `${maxWidthCh}ch`);
+        rendition.themes.override("body", "margin-left", "auto");
+        rendition.themes.override("body", "margin-right", "auto");
+      } catch(e){}
+    } else {
+      try {
+        rendition.themes.override("body", "max-width", "none");
+        rendition.themes.override("body", "margin-left", "0");
+        rendition.themes.override("body", "margin-right", "0");
+      } catch(e){}
+    }
+
+    try { rendition.themes.override("body", "column-gap", `${columnGap}px`); } catch(e){}
+
+    try {
+      rendition.themes.override("p", "text-align", justifyOn ? "justify" : "start");
+      rendition.themes.override("li", "text-align", justifyOn ? "justify" : "start");
+      rendition.themes.override("blockquote", "text-align", justifyOn ? "justify" : "start");
+    } catch(e){}
+
+    const hy = hyphenOn ? "auto" : "manual";
+    try {
+      rendition.themes.override("html", "hyphens", hy);
+      rendition.themes.override("html", "-webkit-hyphens", hy);
+      rendition.themes.override("body", "hyphens", hy);
+      rendition.themes.override("body", "-webkit-hyphens", hy);
+      rendition.themes.override("body", "word-break", "normal");
+      rendition.themes.override("body", "overflow-wrap", "break-word");
+      rendition.themes.override("p", "hyphens", hy);
+      rendition.themes.override("p", "-webkit-hyphens", hy);
+    } catch(e){}
+
+    persistLayoutPrefs();
+    syncLayoutButtons();
+  }
+
   function applyThemeToRendition() {
     if (!rendition) return;
 
@@ -795,7 +779,6 @@ body.reader-open .footer{display:none}
     btnNight.addEventListener("click", () => setTheme(!document.body.classList.contains("night")));
   }
 
-  // ====== UI ======
   function renderCatalog() {
     if (!elBooks) return;
 
@@ -887,7 +870,6 @@ body.reader-open .footer{display:none}
     }, {passive:true});
   });
 
-  // ====== EPUB ======
   async function openBook(item) {
     clearError();
 
@@ -931,20 +913,13 @@ body.reader-open .footer{display:none}
 
       locReadyPromise = (book.ready ? book.ready.then(() => ensureLocations(item)) : ensureLocations(item));
 
-      rendition = book.renderTo("viewer", {
-        width: "100%",
-        height: "100%",
-        spread: "none"
-      });
+      rendition = book.renderTo("viewer", { width: "100%", height: "100%", spread: "none" });
 
-      // Apply theme + prefs after each rendered
       rendition.on("rendered", () => applyThemeToRendition());
 
-      // Nav buttons
       btnPrev.onclick = () => rendition && rendition.prev();
       btnNext.onclick = () => rendition && rendition.next();
 
-      // Restart
       btnRestart.onclick = async () => {
         if (!currentItem || !rendition) return;
         clearPosition(currentItem);
@@ -952,66 +927,37 @@ body.reader-open .footer{display:none}
         try { await rendition.display(); } catch(e) {}
       };
 
-      // Font
-      btnFontMinus.onclick = () => {
-        fontPct = Math.max(80, fontPct - 10);
-        applyReadingPrefs();
-      };
-      btnFontPlus.onclick = () => {
-        fontPct = Math.min(200, fontPct + 10);
-        applyReadingPrefs();
-      };
+      btnFontMinus.onclick = () => { fontPct = Math.max(80, fontPct - 10); applyReadingPrefs(); };
+      btnFontPlus.onclick  = () => { fontPct = Math.min(200, fontPct + 10); applyReadingPrefs(); };
 
-      // Layout controls events
-      if (btnFlow) btnFlow.onclick = () => {
+      btnFlow.onclick = () => {
         flowMode = (flowMode === "paginated") ? "scrolled" : "paginated";
         applyLayoutPrefs();
-        // rafraîchit l'affichage après changement de flow
         try { rendition && rendition.resize(); } catch(e) {}
       };
 
-      if (btnSpread) btnSpread.onclick = () => {
-        // only meaningful in paginated
+      btnSpread.onclick = () => {
         spreadMode = (spreadMode === "auto") ? "none" : "auto";
         applyLayoutPrefs();
         try { rendition && rendition.resize(); } catch(e) {}
       };
 
-      if (btnMargin) btnMargin.onclick = () => {
-        marginPx = cycleValue(MARGIN_STEPS, marginPx);
-        applyLayoutPrefs();
-      };
+      btnMargin.onclick = () => { marginPx = cycleValue(MARGIN_STEPS, marginPx); applyLayoutPrefs(); };
+      btnWidth.onclick  = () => { maxWidthCh = cycleValue(WIDTH_STEPS, maxWidthCh); applyLayoutPrefs(); };
+      btnJustify.onclick= () => { justifyOn = !justifyOn; applyLayoutPrefs(); };
+      btnHyphen.onclick = () => { hyphenOn = !hyphenOn; applyLayoutPrefs(); };
 
-      if (btnWidth) btnWidth.onclick = () => {
-        maxWidthCh = cycleValue(WIDTH_STEPS, maxWidthCh);
-        applyLayoutPrefs();
-      };
-
-      if (btnJustify) btnJustify.onclick = () => {
-        justifyOn = !justifyOn;
-        applyLayoutPrefs();
-      };
-
-      if (btnHyphen) btnHyphen.onclick = () => {
-        hyphenOn = !hyphenOn;
-        applyLayoutPrefs();
-      };
-
-      // Save position + progress
       rendition.on("relocated", (location) => {
         savePosition(item, location);
         updateProgressUI(location);
       });
 
-      // Display (resume if possible)
       if (savedCfi) await rendition.display(savedCfi);
       else await rendition.display();
 
-      // Apply all (theme + prefs)
       applyThemeToRendition();
       syncLayoutButtons();
 
-      // Ensure locations ready then force a first % update
       try {
         await locReadyPromise;
         const loc = rendition && rendition.currentLocation ? rendition.currentLocation() : null;
@@ -1035,17 +981,11 @@ body.reader-open .footer{display:none}
     showCatalog();
   });
 
-  // Fullscreen buttons
   if (btnFs) btnFs.addEventListener("click", toggleFullscreen);
   if (btnFsExit) btnFsExit.addEventListener("click", exitFullscreen);
 
-  // Theme init
   initTheme();
-
-  // Initial labels (avant ouverture livre)
   syncLayoutButtons();
-
-  // Catalog init
   renderCatalog();
 })();
 </script>
