@@ -413,7 +413,10 @@ body.reader-open .footer{display:none}
     if (!book || !book.locations) return false;
 
     try {
-      // already loaded?
+      // IMPORTANT: wait for the book to be ready
+      if (book.ready) await book.ready;
+
+      // already ready?
       if (typeof book.locations.length === "function" && book.locations.length() > 0) return true;
 
       // try load cached locations
@@ -438,15 +441,34 @@ body.reader-open .footer{display:none}
   }
 
   function percentFromLocation(location){
+    const displayed = location && location.start && location.start.displayed;
+
     // 1) direct percentage if provided
     const p = location && location.start && location.start.percentage;
-    if (typeof p === "number" && isFinite(p)) return Math.max(0, Math.min(1, p));
+    if (typeof p === "number" && isFinite(p)) {
+      const pp = Math.max(0, Math.min(1, p));
+      // Ignore degenerate 100% if we are clearly not at the end
+      if (displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99) {
+        // fall through
+      } else {
+        return pp;
+      }
+    }
 
-    // 2) fallback via CFI + locations
+    // 2) fallback via CFI + locations (only if locations ready)
     const cfi = location && location.start && location.start.cfi;
-    if (cfi && book && book.locations && typeof book.locations.percentageFromCfi === "function") {
+    if (!cfi || !book || !book.locations || typeof book.locations.length !== "function") return null;
+    if (book.locations.length() === 0) return null;
+
+    if (typeof book.locations.percentageFromCfi === "function") {
       const px = book.locations.percentageFromCfi(cfi);
-      if (typeof px === "number" && isFinite(px)) return Math.max(0, Math.min(1, px));
+      if (typeof px === "number" && isFinite(px)) {
+        const pp = Math.max(0, Math.min(1, px));
+        if (displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99) {
+          return null;
+        }
+        return pp;
+      }
     }
 
     return null;
@@ -650,8 +672,8 @@ body.reader-open .footer{display:none}
 
       book = window.ePub(arrayBuffer);
 
-      // prepare locations for % progress (async, cached)
-      locReadyPromise = ensureLocations(item);
+      // prepare locations for % progress (wait for book.ready, cache)
+      locReadyPromise = (book.ready ? book.ready.then(() => ensureLocations(item)) : ensureLocations(item));
 
       rendition = book.renderTo("viewer", {
         width: "100%",
