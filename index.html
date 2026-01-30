@@ -24,6 +24,10 @@
 
   /* ===== Catalogue background (fixed, not theme-dependent) ===== */
   --catalog-bg-url:url("https://cclamazonia.noblogs.org/files/2024/11/Arte-CCLA-paredao.jpg");
+
+  /* ===== (1) + (2) + (3) + (4) intégrés ===== */
+  --catalog-bg: var(--catalog-bg-url);
+  --bg-fade: 420ms;
 }
 
 body.night{
@@ -51,41 +55,58 @@ body{
   color:var(--fg);
   -webkit-font-smoothing:antialiased;
   text-rendering:optimizeLegibility;
+
+  /* (2) transitions */
+  position: relative;
+  transition: background-color var(--bg-fade) ease, color var(--bg-fade) ease;
 }
 
-/* ===== Catalogue-only background image (does NOT change with theme) ===== */
-/* Default state = catalogue visible, reader closed */
-body:not(.reader-open){
-  background-image: var(--catalog-bg-url);
+/* (2) Image portée par ::before pour un fondu propre */
+body::before{
+  content:"";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background-image: var(--catalog-bg);
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  background-attachment: fixed;
+  opacity: 1;
+  transition: opacity var(--bg-fade) ease;
 }
 
-/* When reader is open: remove image and use theme background */
-body.reader-open{
-  background-image: none;
-  background: var(--bg);
-}
-
-/* ===== Make catalogue readable on top of background image ===== */
-/* A subtle overlay only for catalogue state */
-body:not(.reader-open)::before{
+/* (2) Voile de lisibilité */
+body::after{
   content:"";
-  position:fixed;
-  inset:0;
-  z-index:0;
-  /* light veil that works in both day/night without changing the image */
-  background: linear-gradient(
-    to bottom,
-    rgba(255,255,255,.72),
-    rgba(255,255,255,.58)
-  );
-  pointer-events:none;
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: rgba(255,255,255,.70);
+  backdrop-filter: blur(1.5px);
+  opacity: 1;
+  transition: opacity var(--bg-fade) ease, background var(--bg-fade) ease;
 }
 
-/* Ensure app content stays above the overlay */
+/* (2) En mode nuit on ajuste uniquement le voile, pas l'image */
+body.night::after{
+  background: rgba(0,0,0,.52);
+}
+
+/* (3) Quand le lecteur est ouvert : on "éteint" l'image, mais on garde un rappel léger */
+body.reader-open::before{
+  opacity: .06;
+}
+body.reader-open::after{
+  opacity: 0;
+}
+
+/* (4) Lisibilité renforcée (optionnel mais conseillé) */
+body.reader-open .viewer,
+body.reader-open .card{
+  background: color-mix(in srgb, var(--bg) 96%, transparent);
+}
+
+/* Ensure app content stays above overlays */
 header, main, footer{
   position:relative;
   z-index:1;
