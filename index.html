@@ -333,11 +333,12 @@ body.reader-open .footer{display:none}
   // Progress %: locations readiness
   let locReadyPromise = Promise.resolve(false);
 
-  // ====== TIMER (robuste, tranche 30s, basé sur temps réel actif) =====
-  let readingSeconds = 0;        // temps sauvegardé (multiple de 30)
-  let readingTickId = null;      // interval UI + calcul
-  let activeStartMs = null;      // moment où la session active a commencé (ms)
-  let activeCarryMs = 0;         // ms actifs accumulés mais pas encore convertis en 30s
+  // ====== TIMER (rAF robuste, tranches 30s) ======
+  let readingSeconds = 0;       // sauvegardé (multiple de 30)
+  let rafId = null;             // requestAnimationFrame id
+  let lastTs = null;            // dernier timestamp rAF
+  let carryMs = 0;              // ms actifs accumulés non convertis
+  const CHUNK_MS = 30000;       // 30 sec
 
   // ====== UTIL ======
   function escapeHtml(value) {
@@ -464,15 +465,11 @@ body.reader-open .footer{display:none}
     return null;
   }
 
-  // ====== TIMER (robuste) ======
+  // ====== TIMER (rAF) ======
   function isReadingActive(){
     return document.body.classList.contains("reader-open")
       && document.visibilityState === "visible"
       && !!currentItem;
-  }
-
-  function nowMs(){
-    return (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
   }
 
   function loadReadingTime(item){
@@ -502,69 +499,58 @@ body.reader-open .footer{display:none}
     elTimePill.textContent = `Tempo: ${formatTime(readingSeconds)}`;
   }
 
-  function syncActiveState(){
-    const active = isReadingActive();
-    const t = nowMs();
-
-    if (active && activeStartMs === null) {
-      activeStartMs = t;
-      return;
-    }
-
-    if (!active && activeStartMs !== null) {
-      activeCarryMs += (t - activeStartMs);
-      activeStartMs = null;
-    }
-  }
-
-  function commitActiveTime(){
-    const t = nowMs();
-
-    if (activeStartMs !== null) {
-      activeCarryMs += (t - activeStartMs);
-      activeStartMs = t;
-    }
-
-    const chunkMs = 30000;
-    const chunks = Math.floor(activeCarryMs / chunkMs);
-
+  function commitChunks(){
+    const chunks = Math.floor(carryMs / CHUNK_MS);
     if (chunks > 0) {
       readingSeconds += chunks * 30;
-      activeCarryMs -= chunks * chunkMs;
+      carryMs -= chunks * CHUNK_MS;
       if (currentItem) saveReadingTime(currentItem);
       updateTimeUI();
     }
   }
 
+  function rafLoop(ts){
+    if (lastTs === null) lastTs = ts;
+
+    let dt = ts - lastTs;
+    lastTs = ts;
+
+    if (!Number.isFinite(dt) || dt < 0) dt = 0;
+    if (dt > 5000) dt = 0; // garde-fou (suspension/throttling)
+
+    if (isReadingActive()) {
+      carryMs += dt;
+      commitChunks();
+    }
+
+    rafId = requestAnimationFrame(rafLoop);
+  }
+
   function startReadingTimer(){
     stopReadingTimer();
-    activeStartMs = null;
-    activeCarryMs = 0;
-
-    syncActiveState();
+    carryMs = 0;
+    lastTs = null;
     updateTimeUI();
-
-    readingTickId = setInterval(() => {
-      syncActiveState();
-      commitActiveTime();
-    }, 1000);
+    rafId = requestAnimationFrame(rafLoop);
   }
 
   function stopReadingTimer(){
-    if (readingTickId) clearInterval(readingTickId);
-    readingTickId = null;
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = null;
 
-    syncActiveState();
-    commitActiveTime();
+    commitChunks();
 
-    activeStartMs = null;
-    activeCarryMs = 0;
+    carryMs = 0;
+    lastTs = null;
   }
 
   document.addEventListener("visibilitychange", () => {
-    syncActiveState();
-    commitActiveTime();
+    lastTs = null; // évite dt énorme au retour
     updateTimeUI();
+  });
+
+  window.addEventListener("pagehide", () => {
+    if (currentItem) saveReadingTime(currentItem);
   });
 
   // ====== READING PREFS ======
