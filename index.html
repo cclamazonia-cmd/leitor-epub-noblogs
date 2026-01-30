@@ -64,14 +64,8 @@ header{
 }
 
 .brand{display:flex;flex-direction:column;gap:2px}
-header strong{
-  font-size:16px;
-  letter-spacing:.2px;
-}
-.tagline{
-  font-size:12px;
-  color:var(--muted);
-}
+header strong{font-size:16px;letter-spacing:.2px}
+.tagline{font-size:12px;color:var(--muted)}
 
 .btn{
   padding:10px 12px;
@@ -84,9 +78,7 @@ header strong{
   transition:transform .08s ease, background .15s ease, border-color .15s ease;
   user-select:none;
 }
-.btn:hover{
-  background:color-mix(in srgb, var(--card) 55%, var(--bg));
-}
+.btn:hover{background:color-mix(in srgb, var(--card) 55%, var(--bg))}
 .btn:active{transform:scale(.98)}
 .btn:focus{outline:2px solid color-mix(in srgb, var(--accent) 35%, transparent);outline-offset:2px}
 
@@ -101,10 +93,7 @@ main{
   margin:18px auto;
   padding:0 16px 24px;
 }
-
-body.reader-open main{
-  max-width:min(1200px, 96vw);
-}
+body.reader-open main{max-width:min(1200px, 96vw)}
 
 .card{
   background:var(--card);
@@ -166,24 +155,50 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   background:var(--card);
 }
 
+.viewer-left,.viewer-right{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-width: 180px;
+}
+.viewer-left{justify-content:flex-start}
+.viewer-right{justify-content:flex-end}
+
 .viewer-center{
   display:flex;
   align-items:center;
   gap:10px;
-  min-width: 220px;
   justify-content:center;
 }
 
 .viewer-hint{
   color:var(--muted);
   font-size:13px;
-  min-width: 130px;
+  min-width: 150px;
   text-align:center;
+}
+
+/* Badge “saved” */
+.save-badge{
+  font-size:12px;
+  color:var(--muted);
+  padding:6px 10px;
+  border:1px solid var(--border);
+  border-radius:999px;
+  background:color-mix(in srgb, var(--bg) 70%, var(--card));
+  opacity:0;
+  transform:translateY(2px);
+  transition:opacity .18s ease, transform .18s ease;
+  white-space:nowrap;
+}
+.save-badge.show{
+  opacity:1;
+  transform:translateY(0);
 }
 
 #viewer{
   width:100%;
-  height: calc(100vh - 210px);
+  height: calc(100vh - 230px);
   background:var(--bg);
 }
 
@@ -211,14 +226,8 @@ code{
   align-items:center;
   padding:28px 16px 40px;
 }
-.footer-logo{
-  max-height:150px;
-  width:auto;
-  display:block;
-}
-
-/* Cache le footer quand le lecteur est ouvert */
-body.reader-open .footer{ display:none; }
+.footer-logo{max-height:150px;width:auto;display:block}
+body.reader-open .footer{display:none}
 </style>
 </head>
 
@@ -250,7 +259,10 @@ body.reader-open .footer{ display:none; }
 
     <div class="viewer">
       <div class="viewer-toolbar">
-        <button class="btn" id="prevBtn" type="button" aria-label="Página anterior">←</button>
+        <div class="viewer-left">
+          <button class="btn" id="prevBtn" type="button" aria-label="Página anterior">←</button>
+          <button class="btn" id="restartBtn" type="button" aria-label="Recomeçar do início">Recomeçar</button>
+        </div>
 
         <div class="viewer-center">
           <button class="btn" id="fontMinus" type="button" aria-label="Diminuir fonte">A−</button>
@@ -258,7 +270,10 @@ body.reader-open .footer{ display:none; }
           <button class="btn" id="fontPlus" type="button" aria-label="Aumentar fonte">A+</button>
         </div>
 
-        <button class="btn" id="nextBtn" type="button" aria-label="Próxima página">→</button>
+        <div class="viewer-right">
+          <span class="save-badge" id="saveBadge" aria-live="polite">Última leitura salva ✅</span>
+          <button class="btn" id="nextBtn" type="button" aria-label="Próxima página">→</button>
+        </div>
       </div>
 
       <div id="viewer" aria-label="Área de leitura"></div>
@@ -292,20 +307,26 @@ body.reader-open .footer{ display:none; }
   const elTitle = document.getElementById("bookTitle");
   const elProgress = document.getElementById("progress");
   const elError = document.getElementById("errorBox");
+  const elSaveBadge = document.getElementById("saveBadge");
 
   const btnNight = document.getElementById("toggleNight");
   const btnBack = document.getElementById("backBtn");
   const btnPrev = document.getElementById("prevBtn");
   const btnNext = document.getElementById("nextBtn");
+  const btnRestart = document.getElementById("restartBtn");
   const btnFontMinus = document.getElementById("fontMinus");
   const btnFontPlus  = document.getElementById("fontPlus");
 
   // ====== STATE ======
   let book = null;
   let rendition = null;
+  let currentItem = null;
 
   // Taille de police (EPUB) persistée
   let fontPct = Number(localStorage.getItem("fontPct") || 110); // 110% défaut
+
+  // Badge timer
+  let saveBadgeTimer = null;
 
   // ====== UTIL ======
   function escapeHtml(value) {
@@ -334,6 +355,41 @@ body.reader-open .footer{ display:none; }
     elLeitor.style.display = "none";
     elCatalogo.style.display = "block";
     document.body.classList.remove("reader-open");
+  }
+
+  function showSavedBadge() {
+    if (!elSaveBadge) return;
+    elSaveBadge.classList.add("show");
+    if (saveBadgeTimer) clearTimeout(saveBadgeTimer);
+    saveBadgeTimer = setTimeout(() => elSaveBadge.classList.remove("show"), 1400);
+  }
+
+  // ====== PROGRESS SAVE (CFI) ======
+  function storageKeyForBook(item) {
+    return "pos:" + (item && item.id ? item.id : "unknown");
+  }
+
+  function savePosition(item, location) {
+    try {
+      const cfi = location && location.start && location.start.cfi;
+      if (!cfi) return;
+      localStorage.setItem(storageKeyForBook(item), cfi);
+      showSavedBadge();
+    } catch(e) { /* ignore */ }
+  }
+
+  function loadPosition(item) {
+    try {
+      return localStorage.getItem(storageKeyForBook(item));
+    } catch(e) {
+      return null;
+    }
+  }
+
+  function clearPosition(item) {
+    try {
+      localStorage.removeItem(storageKeyForBook(item));
+    } catch(e) { /* ignore */ }
   }
 
   // ====== READING PREFS ======
@@ -375,7 +431,7 @@ body.reader-open .footer{ display:none; }
 
     rendition.themes.select("app");
 
-    // Marges de lecture : aide beaucoup sur des EPUB hétérogènes
+    // Marges de lecture
     try {
       rendition.themes.override("body", "padding", "18px 18px 24px 18px");
       rendition.themes.override("body", "margin", "0");
@@ -440,9 +496,14 @@ body.reader-open .footer{ display:none; }
   async function openBook(item) {
     clearError();
 
+    currentItem = item;
+
     showReader();
     elTitle.textContent = item.title || "Livro";
-    elProgress.textContent = "Carregando…";
+
+    const savedCfi = loadPosition(item);
+    elProgress.textContent = savedCfi ? "Retomando…" : "Carregando…";
+    if (elSaveBadge) elSaveBadge.classList.remove("show");
 
     if (typeof window.ePub !== "function") {
       showError(
@@ -478,6 +539,18 @@ body.reader-open .footer{ display:none; }
       btnPrev.onclick = () => rendition && rendition.prev();
       btnNext.onclick = () => rendition && rendition.next();
 
+      // Recomeçar (efface position + restart)
+      btnRestart.onclick = async () => {
+        if (!currentItem || !rendition) return;
+        clearPosition(currentItem);
+        elProgress.textContent = "Carregando…";
+        try {
+          await rendition.display(); // début
+        } catch(e) {
+          // ignore
+        }
+      };
+
       // Font controls
       btnFontMinus.onclick = () => {
         fontPct = Math.max(80, fontPct - 10);
@@ -489,6 +562,9 @@ body.reader-open .footer{ display:none; }
       };
 
       rendition.on("relocated", (location) => {
+        // Sauvegarde automatique de la position
+        savePosition(item, location);
+
         const displayed = location && location.start && location.start.displayed;
         if (displayed && displayed.page && displayed.total) {
           elProgress.textContent = `Página ${displayed.page} / ${displayed.total}`;
@@ -499,10 +575,14 @@ body.reader-open .footer{ display:none; }
 
       rendition.on("rendered", () => applyThemeToRendition());
 
-      await rendition.display();
-      applyThemeToRendition();
+      // Restauration position si existante
+      if (savedCfi) {
+        await rendition.display(savedCfi);
+      } else {
+        await rendition.display();
+      }
 
-      elProgress.textContent = "—";
+      applyThemeToRendition();
     } catch (err) {
       console.error(err);
       showError(
