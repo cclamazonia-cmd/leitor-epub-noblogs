@@ -166,6 +166,25 @@ code{
   background:var(--bg);
   color:var(--fg);
 }
+
+/* ===== Footer logo (Biblioteca) ===== */
+.footer{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  padding:28px 16px 40px;
+}
+
+.footer-logo{
+  max-height:150px;
+  width:auto;
+  display:block;
+}
+
+/* Cache le footer quand le lecteur est ouvert */
+body.reader-open .footer{
+  display:none;
+}
 </style>
 </head>
 
@@ -183,7 +202,6 @@ code{
     <p>Escolha um livro para abrir no leitor.</p>
 
     <div id="books"></div>
-
   </section>
 
   <!-- LEITOR -->
@@ -207,6 +225,10 @@ code{
 
 </main>
 
+<footer class="footer" aria-label="Editora CCLA">
+  <img class="footer-logo" src="assets/CCLA_Editora.png" alt="Editora CCLA">
+</footer>
+
 <script src="jszip.min.js"></script>
 <script src="epub.min.js"></script>
 <script>
@@ -214,7 +236,6 @@ code{
   "use strict";
 
   // ====== CONFIG ======
-  // Mets ici tes livres (fichiers dans epubs/)
   const BOOKS = [
     { id: "extrativismo", title: "Extrativismo", author: "Anna Bednik e Jérémy Dotti", file: "extrativismo.epub" },
     { id: "geografia-libertaria", title: "Por uma Geografia libertária", author: "Marcelo Lopes de Souza", file: "mls.epub" }
@@ -236,7 +257,6 @@ code{
   // ====== STATE ======
   let book = null;
   let rendition = null;
-  let currentBook = null;
 
   // ====== UTIL ======
   function escapeHtml(value) {
@@ -258,11 +278,13 @@ code{
   function showReader() {
     elCatalogo.style.display = "none";
     elLeitor.style.display = "block";
+    document.body.classList.add("reader-open");
   }
 
   function showCatalog() {
     elLeitor.style.display = "none";
     elCatalogo.style.display = "block";
+    document.body.classList.remove("reader-open");
   }
 
   // ====== THEME ======
@@ -331,10 +353,9 @@ code{
     });
   }
 
-  // ====== EPUB (robuste en local) ======
+  // ====== EPUB ======
   async function openBook(item) {
     clearError();
-    currentBook = item;
 
     showReader();
     elTitle.textContent = item.title || "Livro";
@@ -346,11 +367,11 @@ code{
         "Verifique se existe o arquivo: epub.min.js\n" +
         "na mesma pasta do arquivo HTML."
       );
+      elProgress.textContent = "—";
       return;
     }
 
     try {
-      // Nettoyage
       if (rendition) {
         try { rendition.destroy(); } catch(e) {}
         rendition = null;
@@ -359,22 +380,10 @@ code{
 
       const path = "epubs/" + item.file;
 
-      // Chargement binaire (plus fiable en local)
       let arrayBuffer;
-      try {
-        const resp = await fetch(path);
-        if (!resp.ok) throw new Error("HTTP " + resp.status);
-        arrayBuffer = await resp.arrayBuffer();
-      } catch (e) {
-        showError(
-          "Não consegui acessar o arquivo EPUB.\n" +
-          "Verifique se ele existe em epubs/ e se o nome está correto:\n" +
-          item.file + "\n\n" +
-          "Observação: em alguns navegadores, abrir por duplo-clique (file:///) pode bloquear o acesso."
-        );
-        elProgress.textContent = "—";
-        return;
-      }
+      const resp = await fetch(path);
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      arrayBuffer = await resp.arrayBuffer();
 
       book = window.ePub(arrayBuffer);
 
@@ -384,7 +393,6 @@ code{
         spread: "none"
       });
 
-      // Navigation
       btnPrev.onclick = () => rendition && rendition.prev();
       btnNext.onclick = () => rendition && rendition.next();
 
@@ -413,13 +421,11 @@ code{
     }
   }
 
-  // Retour
   btnBack.addEventListener("click", () => {
     clearError();
     showCatalog();
   });
 
-  // Démarrage
   initTheme();
   renderCatalog();
 })();
@@ -427,5 +433,3 @@ code{
 
 </body>
 </html>
-
-
