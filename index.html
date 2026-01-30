@@ -104,7 +104,7 @@ body.reader-open main{max-width:min(1200px, 96vw)}
 h2{margin:0 0 8px 0;font-size:18px}
 p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
 
-/* ===== Catalogue "future-proof" ===== */
+/* ===== Catalogue ===== */
 .book{
   display:flex;
   justify-content:space-between;
@@ -124,7 +124,6 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   min-width:0;
 }
 
-/* cover */
 .book-cover{
   height:60px;
   width:auto;
@@ -153,9 +152,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   background:color-mix(in srgb, var(--card) 70%, var(--bg));
 }
 
-.book-meta{
-  min-width:0;
-}
+.book-meta{min-width:0;}
 .book strong{
   display:block;
   font-size:16px;
@@ -180,21 +177,13 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   flex:0 0 auto;
 }
 
-/* Sur mobile : actions sous le texte */
 @media (max-width: 560px){
-  .book{
-    align-items:flex-start;
-  }
-  .book-actions{
-    flex-direction:column;
-    align-items:stretch;
-  }
-  .book strong, .book small{
-    white-space:normal;
-  }
+  .book{align-items:flex-start;}
+  .book-actions{flex-direction:column;align-items:stretch;}
+  .book strong, .book small{white-space:normal;}
 }
 
-/* ===== Reader / Viewer styles inchangés ===== */
+/* ===== Reader ===== */
 .reader-top{
   display:flex;
   justify-content:space-between;
@@ -285,7 +274,6 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   background:var(--bg);
 }
 
-/* Toolbar en grid plus tôt => pas de chevauchement */
 @media (max-width: 1100px){
   .viewer-toolbar{
     display:grid;
@@ -309,12 +297,8 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
       "center"
       "right";
   }
-  .viewer-left,.viewer-center,.viewer-right{
-    justify-content:space-between;
-  }
-  .layout-controls{
-    justify-content:flex-start;
-  }
+  .viewer-left,.viewer-center,.viewer-right{justify-content:space-between;}
+  .layout-controls{justify-content:flex-start;}
   .viewer-right{gap:10px;}
   .btn{padding:9px 10px; font-size:13px; border-radius:11px}
   .pill,.save-badge{font-size:11px; padding:5px 8px}
@@ -368,14 +352,6 @@ body.fs .reader-top{display:none}
   background:color-mix(in srgb, var(--card) 75%, var(--bg));
 }
 
-code{
-  padding:2px 6px;
-  border-radius:8px;
-  border:1px solid var(--border);
-  background:var(--bg);
-  color:var(--fg);
-}
-
 .footer{
   display:flex;
   justify-content:center;
@@ -412,7 +388,6 @@ body.reader-open .footer{display:none}
     <div class="viewer" id="viewerShell">
       <div class="viewer-toolbar">
         <div class="viewer-left">
-          <button class="btn" id="prevBtn" type="button" aria-label="Página anterior">←</button>
           <button class="btn" id="restartBtn" type="button" aria-label="Recomeçar do início">Recomeçar</button>
           <button class="btn" id="fsBtn" type="button" aria-label="Tela cheia">⛶</button>
         </div>
@@ -425,8 +400,6 @@ body.reader-open .footer{display:none}
 
         <div class="viewer-right">
           <div class="layout-controls">
-            <button class="btn" id="flowBtn" type="button" aria-label="Alternar modo de leitura">📄</button>
-            <button class="btn" id="spreadBtn" type="button" aria-label="Alternar colunas">Colunas</button>
             <button class="btn" id="marginBtn" type="button" aria-label="Ajustar margens">Margens</button>
             <button class="btn" id="widthBtn" type="button" aria-label="Ajustar largura do texto">Largura</button>
             <button class="btn" id="justifyBtn" type="button" aria-label="Justificação">J</button>
@@ -435,7 +408,6 @@ body.reader-open .footer{display:none}
 
           <span class="pill" id="timePill" aria-label="Tempo de leitura">Tempo: 00:00</span>
           <span class="save-badge" id="saveBadge" aria-live="polite">Última leitura salva ✅</span>
-          <button class="btn" id="nextBtn" type="button" aria-label="Próxima página">→</button>
         </div>
       </div>
 
@@ -458,10 +430,6 @@ body.reader-open .footer{display:none}
   "use strict";
 
   // ====== CONFIG ======
-  // Renomme tes fichiers cover en:
-  // assets/covers/capa-extrativismo.jpg
-  // assets/covers/capa-mls.jpg
-  // (évite les espaces pour rester "future-proof")
   const BOOKS = [
     {
       id: "extrativismo",
@@ -469,7 +437,6 @@ body.reader-open .footer{display:none}
       author: "Anna Bednik e Jérémy Dotti",
       file: "extrativismo.epub",
       cover: "assets/covers/capa-extrativismo.jpg",
-      pagination: false,
       nudge: false
     },
     {
@@ -478,7 +445,6 @@ body.reader-open .footer{display:none}
       author: "Marcelo Lopes de Souza",
       file: "mls.epub",
       cover: "assets/covers/capa-mls.jpg",
-      pagination: false,
       nudge: true
     }
   ];
@@ -495,8 +461,6 @@ body.reader-open .footer{display:none}
 
   const btnNight = document.getElementById("toggleNight");
   const btnBack = document.getElementById("backBtn");
-  const btnPrev = document.getElementById("prevBtn");
-  const btnNext = document.getElementById("nextBtn");
   const btnRestart = document.getElementById("restartBtn");
   const btnFontMinus = document.getElementById("fontMinus");
   const btnFontPlus  = document.getElementById("fontPlus");
@@ -507,8 +471,6 @@ body.reader-open .footer{display:none}
   const btnFsExit = document.getElementById("fsExitBtn");
 
   // Layout controls
-  const btnFlow   = document.getElementById("flowBtn");
-  const btnSpread = document.getElementById("spreadBtn");
   const btnMargin = document.getElementById("marginBtn");
   const btnWidth  = document.getElementById("widthBtn");
   const btnJustify= document.getElementById("justifyBtn");
@@ -521,13 +483,6 @@ body.reader-open .footer{display:none}
 
   let fontPct = Number(localStorage.getItem("fontPct") || 110);
   let saveBadgeTimer = null;
-
-  // Layout prefs
-  let flowMode   = localStorage.getItem("flowMode") || "scrolled-doc";
-  if (flowMode !== "paginated" && flowMode !== "scrolled-doc") flowMode = "scrolled-doc";
-
-  let spreadMode = localStorage.getItem("spreadMode") || "none";
-  if (spreadMode !== "none" && spreadMode !== "auto") spreadMode = "none";
 
   let marginPx   = Number(localStorage.getItem("marginPx") || 18);
   let maxWidthCh = Number(localStorage.getItem("maxWidthCh") || 72);
@@ -695,8 +650,6 @@ body.reader-open .footer{display:none}
 
   function persistLayoutPrefs(){
     try {
-      localStorage.setItem("flowMode", flowMode);
-      localStorage.setItem("spreadMode", spreadMode);
       localStorage.setItem("marginPx", String(marginPx));
       localStorage.setItem("maxWidthCh", String(maxWidthCh));
       localStorage.setItem("justifyOn", justifyOn ? "1" : "0");
@@ -705,19 +658,12 @@ body.reader-open .footer{display:none}
     } catch(e){}
   }
 
-  function labelFlow(){ return (flowMode === "paginated") ? "📄" : "📜"; }
-  function labelSpread(){ return (spreadMode === "auto") ? "2 col" : "1 col"; }
   function labelMargin(){ return `M ${marginPx}`; }
   function labelWidth(){ return (maxWidthCh && maxWidthCh > 0) ? `${maxWidthCh}ch` : "Tela"; }
   function labelJustify(){ return justifyOn ? "J✓" : "J"; }
   function labelHyphen(){ return hyphenOn ? "Hy✓" : "Hy"; }
 
   function syncLayoutButtons(){
-    if (btnFlow) btnFlow.textContent = labelFlow();
-    if (btnSpread) {
-      btnSpread.textContent = `Col ${labelSpread()}`;
-      btnSpread.disabled = (flowMode !== "paginated");
-    }
     if (btnMargin) btnMargin.textContent = labelMargin();
     if (btnWidth)  btnWidth.textContent = `L ${labelWidth()}`;
     if (btnJustify)btnJustify.textContent = labelJustify();
@@ -826,9 +772,8 @@ p,li,blockquote,div,section,article{
   function applyLayoutPrefs(){
     if (!rendition) return;
 
-    try { rendition.flow(flowMode); } catch(e) {}
-    const effectiveSpread = (flowMode === "paginated") ? spreadMode : "none";
-    try { rendition.spread(effectiveSpread); } catch(e) {}
+    try { rendition.flow("scrolled-doc"); } catch(e) {}
+    try { rendition.spread("none"); } catch(e) {}
 
     persistLayoutPrefs();
     syncLayoutButtons();
@@ -844,7 +789,7 @@ p,li,blockquote,div,section,article{
     applyLayoutPrefs();
   }
 
-  // ===== Theme (défini UNE SEULE FOIS) =====
+  // ===== Theme =====
   function setTheme(isNight) {
     document.body.classList.toggle("night", isNight);
     localStorage.setItem("theme", isNight ? "night" : "day");
@@ -987,13 +932,23 @@ p,li,blockquote,div,section,article{
     catch(e){ return false; }
   }
 
-  async function nudgeRendition(){
+  // ===== NUDGE SAFE (sans next/prev) =====
+  async function safeNudge(item){
     if (!rendition) return;
     try { rendition.resize(); } catch(e) {}
     await new Promise(r => setTimeout(r, 80));
-    try { await rendition.next(); } catch(e) {}
-    await new Promise(r => setTimeout(r, 80));
-    try { await rendition.prev(); } catch(e) {}
+
+    // Re-affiche la position (si existante), sinon un point de départ lisible
+    try{
+      const savedCfi = loadPosition(item);
+      if (savedCfi) {
+        await rendition.display(savedCfi);
+      } else {
+        const ok = await displayFirstReadable();
+        if (!ok) await rendition.display();
+      }
+    } catch(e){}
+
     await new Promise(r => setTimeout(r, 80));
     try { rendition.resize(); } catch(e) {}
   }
@@ -1033,22 +988,22 @@ p,li,blockquote,div,section,article{
       book = window.ePub(arrayBuffer);
       if (book.ready) await book.ready;
 
-      rendition = book.renderTo("viewer", { width: "100%", height: "100%", spread: "none" });
+      rendition = book.renderTo("viewer", {
+        width: "100%",
+        height: "100%",
+        spread: "none"
+      });
+
+      // Mode unique
+      try { rendition.flow("scrolled-doc"); } catch(e) {}
+      try { rendition.spread("none"); } catch(e) {}
 
       rendition.on("relocated", (location) => {
         savePosition(item, location);
         updateProgressUI(location);
       });
 
-      if (item.pagination === false) {
-        flowMode = "scrolled-doc";
-        spreadMode = "none";
-        showNotice("ℹ️ Paginação desativada para este EPUB (instável). Modo rolagem ativado.");
-      }
-
-      btnPrev.onclick = () => rendition && rendition.prev();
-      btnNext.onclick = () => rendition && rendition.next();
-
+      // Restart
       btnRestart.onclick = async () => {
         if (!currentItem || !rendition) return;
         clearPosition(currentItem);
@@ -1056,30 +1011,20 @@ p,li,blockquote,div,section,article{
         const ok = await displayFirstReadable();
         if (!ok) { try { await rendition.display(); } catch(e) {} }
         applyThemeToRendition();
-        if (item.nudge) await nudgeRendition();
+        if (item.nudge) await safeNudge(item);
       };
 
+      // Font
       btnFontMinus.onclick = () => { fontPct = Math.max(80, fontPct - 10); applyReadingPrefs(); try{rendition.resize();}catch(e){} };
       btnFontPlus.onclick  = () => { fontPct = Math.min(200, fontPct + 10); applyReadingPrefs(); try{rendition.resize();}catch(e){} };
 
-      btnFlow.onclick = () => {
-        if (item.pagination === false) return;
-        flowMode = (flowMode === "paginated") ? "scrolled-doc" : "paginated";
-        if (flowMode !== "paginated") spreadMode = "none";
-        applyLayoutPrefs();
-      };
-
-      btnSpread.onclick = () => {
-        if (flowMode !== "paginated") return;
-        spreadMode = (spreadMode === "auto") ? "none" : "auto";
-        applyLayoutPrefs();
-      };
-
+      // Layout
       btnMargin.onclick = () => { marginPx = cycleValue(MARGIN_STEPS, marginPx); applyLayoutPrefs(); };
       btnWidth.onclick  = () => { maxWidthCh = cycleValue(WIDTH_STEPS, maxWidthCh); applyLayoutPrefs(); };
       btnJustify.onclick= () => { justifyOn = !justifyOn; applyLayoutPrefs(); };
       btnHyphen.onclick = () => { hyphenOn = !hyphenOn; applyLayoutPrefs(); };
 
+      // Display initial
       const savedCfi = loadPosition(item);
       if (savedCfi) {
         await rendition.display(savedCfi);
@@ -1091,15 +1036,9 @@ p,li,blockquote,div,section,article{
       applyThemeToRendition();
       syncLayoutButtons();
 
-      if (item.pagination === false) {
-        btnFlow.disabled = true;
-        btnSpread.disabled = true;
-      } else {
-        btnFlow.disabled = false;
-        btnSpread.disabled = (flowMode !== "paginated");
-      }
+      if (item.nudge) await safeNudge(item);
 
-      if (item.nudge) await nudgeRendition();
+      showNotice("ℹ️ Leitura em rolagem (scroll) ativada. Paginação/next/prev removidos.");
 
     } catch (err) {
       console.error(err);
