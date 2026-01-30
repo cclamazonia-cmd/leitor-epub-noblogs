@@ -16,6 +16,11 @@
   --btnfg:var(--fg);
   --accent:#111111;
   --accentfg:#ffffff;
+
+  --radius:16px;
+  --shadow:0 10px 30px rgba(0,0,0,.08);
+  --font-ui:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --font-reading:ui-serif,"Georgia","Times New Roman",Times,serif;
 }
 
 body.night{
@@ -28,15 +33,20 @@ body.night{
   --btnfg:var(--fg);
   --accent:#e9edf1;
   --accentfg:#0f1115;
+
+  --shadow:0 12px 34px rgba(0,0,0,.35);
 }
 
 *{box-sizing:border-box}
 html,body{height:100%}
+
 body{
   margin:0;
-  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  font-family:var(--font-ui);
   background:var(--bg);
   color:var(--fg);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
 }
 
 header{
@@ -45,27 +55,40 @@ header{
   z-index:10;
   padding:12px 16px;
   border-bottom:1px solid var(--border);
-  background:var(--bg);
+  background:color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter:saturate(140%) blur(8px);
   display:flex;
   justify-content:space-between;
   align-items:center;
   gap:12px;
 }
 
+.brand{display:flex;flex-direction:column;gap:2px}
 header strong{
   font-size:16px;
   letter-spacing:.2px;
 }
+.tagline{
+  font-size:12px;
+  color:var(--muted);
+}
 
 .btn{
-  padding:8px 10px;
+  padding:10px 12px;
   border:1px solid var(--border);
   background:var(--btnbg);
   color:var(--btnfg);
-  border-radius:10px;
+  border-radius:12px;
   cursor:pointer;
   font-size:14px;
+  transition:transform .08s ease, background .15s ease, border-color .15s ease;
+  user-select:none;
 }
+.btn:hover{
+  background:color-mix(in srgb, var(--card) 55%, var(--bg));
+}
+.btn:active{transform:scale(.98)}
+.btn:focus{outline:2px solid color-mix(in srgb, var(--accent) 35%, transparent);outline-offset:2px}
 
 .btn-primary{
   border-color:transparent;
@@ -74,36 +97,40 @@ header strong{
 }
 
 main{
-  max-width:900px;
+  max-width:980px;
   margin:18px auto;
-  padding:0 16px;
+  padding:0 16px 24px;
+}
+
+body.reader-open main{
+  max-width:min(1200px, 96vw);
 }
 
 .card{
   background:var(--card);
   border:1px solid var(--border);
-  border-radius:14px;
+  border-radius:var(--radius);
   padding:16px;
   margin-bottom:16px;
+  box-shadow:var(--shadow);
 }
 
 h2{margin:0 0 8px 0;font-size:18px}
-p{margin:0 0 12px 0;color:var(--muted);line-height:1.5}
+p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
 
 .book{
   display:flex;
   justify-content:space-between;
   align-items:center;
-  gap:12px;
-  padding:12px;
+  gap:14px;
+  padding:14px;
   border:1px solid var(--border);
-  border-radius:12px;
+  border-radius:14px;
   background:var(--bg);
-  margin-bottom:10px;
+  margin-bottom:12px;
 }
-
-.book strong{display:block;font-size:15px}
-.book small{color:var(--muted)}
+.book strong{display:block;font-size:16px;letter-spacing:.2px}
+.book small{color:var(--muted);display:block;margin-top:2px}
 
 .reader-top{
   display:flex;
@@ -114,17 +141,17 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.5}
 }
 
 .reader-title{
-  font-size:15px;
+  font-size:14px;
   color:var(--muted);
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
-  max-width:65%;
+  max-width:70%;
 }
 
 .viewer{
   border:1px solid var(--border);
-  border-radius:14px;
+  border-radius:var(--radius);
   overflow:hidden;
   background:var(--bg);
 }
@@ -139,14 +166,24 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.5}
   background:var(--card);
 }
 
+.viewer-center{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width: 220px;
+  justify-content:center;
+}
+
 .viewer-hint{
   color:var(--muted);
   font-size:13px;
+  min-width: 130px;
+  text-align:center;
 }
 
 #viewer{
   width:100%;
-  height:70vh;
+  height: calc(100vh - 210px);
   background:var(--bg);
 }
 
@@ -174,7 +211,6 @@ code{
   align-items:center;
   padding:28px 16px 40px;
 }
-
 .footer-logo{
   max-height:150px;
   width:auto;
@@ -182,15 +218,16 @@ code{
 }
 
 /* Cache le footer quand le lecteur est ouvert */
-body.reader-open .footer{
-  display:none;
-}
+body.reader-open .footer{ display:none; }
 </style>
 </head>
 
 <body>
 <header>
-  <strong>Biblioteca</strong>
+  <div class="brand">
+    <strong>Biblioteca</strong>
+    <span class="tagline">Leitor EPUB • Editora CCLA</span>
+  </div>
   <button class="btn" id="toggleNight" type="button" aria-label="Alternar tema">🌙 Noite</button>
 </header>
 
@@ -214,9 +251,16 @@ body.reader-open .footer{
     <div class="viewer">
       <div class="viewer-toolbar">
         <button class="btn" id="prevBtn" type="button" aria-label="Página anterior">←</button>
-        <div class="viewer-hint" id="progress">—</div>
+
+        <div class="viewer-center">
+          <button class="btn" id="fontMinus" type="button" aria-label="Diminuir fonte">A−</button>
+          <div class="viewer-hint" id="progress">—</div>
+          <button class="btn" id="fontPlus" type="button" aria-label="Aumentar fonte">A+</button>
+        </div>
+
         <button class="btn" id="nextBtn" type="button" aria-label="Próxima página">→</button>
       </div>
+
       <div id="viewer" aria-label="Área de leitura"></div>
     </div>
 
@@ -253,10 +297,15 @@ body.reader-open .footer{
   const btnBack = document.getElementById("backBtn");
   const btnPrev = document.getElementById("prevBtn");
   const btnNext = document.getElementById("nextBtn");
+  const btnFontMinus = document.getElementById("fontMinus");
+  const btnFontPlus  = document.getElementById("fontPlus");
 
   // ====== STATE ======
   let book = null;
   let rendition = null;
+
+  // Taille de police (EPUB) persistée
+  let fontPct = Number(localStorage.getItem("fontPct") || 110); // 110% défaut
 
   // ====== UTIL ======
   function escapeHtml(value) {
@@ -287,21 +336,55 @@ body.reader-open .footer{
     document.body.classList.remove("reader-open");
   }
 
+  // ====== READING PREFS ======
+  function applyReadingPrefs() {
+    if (!rendition) return;
+    try {
+      rendition.themes.fontSize(fontPct + "%");
+      localStorage.setItem("fontPct", String(fontPct));
+    } catch(e) {
+      // ignore
+    }
+  }
+
   // ====== THEME ======
   function applyThemeToRendition() {
     if (!rendition) return;
+
     const night = document.body.classList.contains("night");
 
     rendition.themes.register("app", {
       "body": {
         "background": night ? "#0f1115" : "#ffffff",
-        "color": night ? "#e9edf1" : "#111111"
+        "color": night ? "#e9edf1" : "#111111",
+        "line-height": "1.65",
+        "text-rendering": "optimizeLegibility"
+      },
+      "p": {
+        "line-height": "1.65",
+        "margin": "0 0 1em 0"
+      },
+      "h1,h2,h3": {
+        "line-height": "1.25",
+        "margin": "1.2em 0 .6em 0"
       },
       "a": {
         "color": night ? "#8ab4f8" : "#0b57d0"
       }
     });
+
     rendition.themes.select("app");
+
+    // Marges de lecture : aide beaucoup sur des EPUB hétérogènes
+    try {
+      rendition.themes.override("body", "padding", "18px 18px 24px 18px");
+      rendition.themes.override("body", "margin", "0");
+      rendition.themes.override("html", "margin", "0");
+    } catch(e) {
+      // ignore
+    }
+
+    applyReadingPrefs();
   }
 
   function setTheme(isNight) {
@@ -380,21 +463,30 @@ body.reader-open .footer{
 
       const path = "epubs/" + item.file;
 
-      let arrayBuffer;
       const resp = await fetch(path);
       if (!resp.ok) throw new Error("HTTP " + resp.status);
-      arrayBuffer = await resp.arrayBuffer();
+      const arrayBuffer = await resp.arrayBuffer();
 
       book = window.ePub(arrayBuffer);
 
       rendition = book.renderTo("viewer", {
         width: "100%",
-        height: "70vh",
+        height: "100%",
         spread: "none"
       });
 
       btnPrev.onclick = () => rendition && rendition.prev();
       btnNext.onclick = () => rendition && rendition.next();
+
+      // Font controls
+      btnFontMinus.onclick = () => {
+        fontPct = Math.max(80, fontPct - 10);
+        applyReadingPrefs();
+      };
+      btnFontPlus.onclick = () => {
+        fontPct = Math.min(200, fontPct + 10);
+        applyReadingPrefs();
+      };
 
       rendition.on("relocated", (location) => {
         const displayed = location && location.start && location.start.displayed;
@@ -433,5 +525,3 @@ body.reader-open .footer{
 
 </body>
 </html>
-
-
