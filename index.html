@@ -266,7 +266,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   background:var(--bg);
 }
 
-/* Scroll: épingles UI */
+/* Masquer les flèches en mode scroll */
 body.flow-scroll #prevBtn,
 body.flow-scroll #nextBtn{
   display:none;
@@ -899,6 +899,7 @@ body.reader-open .footer{display:none}
     const href = String(it.href || "").toLowerCase();
     const id = String(it.idref || it.id || "").toLowerCase();
     const props = String(it.properties || "").toLowerCase();
+
     if (props.includes("cover")) return true;
     if (href.includes("cover") || href.includes("titlepage") || href.includes("capa")) return true;
     if (id.includes("cover") || id.includes("titlepage")) return true;
@@ -916,86 +917,30 @@ body.reader-open .footer{display:none}
     return false;
   }
 
-  // ====== COVER SCROLL BRIDGE (FIX) ======
-  let coverBridgeInstalled = false;
-  let coverBridgeCooldown = false;
-  let touchStartY = null;
+  async function displayCoverFirstIfAny(){
+    if (!book || !rendition || !book.spine || !Array.isArray(book.spine.items)) return false;
 
-  function canBridgeNow(){
-    if (!rendition || !book) return false;
-    if (flowMode !== "scrolled-doc") return false;
-    let loc = null;
-    try { loc = rendition.currentLocation && rendition.currentLocation(); } catch(e){}
-    return locationLooksLikeCover(loc);
+    const items = book.spine.items;
+    const coverItem = items.find(it => isCoverSpineItem(it)) || null;
+    const href = coverItem && coverItem.href ? coverItem.href : null;
+    if (!href) return false;
+
+    try {
+      await rendition.display(href);
+      return true;
+    } catch(e){
+      return false;
+    }
   }
 
-  function bridgeNext(){
-    if (!rendition) return;
-    if (coverBridgeCooldown) return;
-    coverBridgeCooldown = true;
-    setTimeout(() => { coverBridgeCooldown = false; }, 280);
-    try { rendition.next(); } catch(e){}
-  }
-
-  function bridgePrev(){
-    if (!rendition) return;
-    if (coverBridgeCooldown) return;
-    coverBridgeCooldown = true;
-    setTimeout(() => { coverBridgeCooldown = false; }, 280);
-    try { rendition.prev(); } catch(e){}
-  }
-
-  function installCoverBridge(){
-    if (coverBridgeInstalled) return;
-    if (!viewerShell) return;
-    coverBridgeInstalled = true;
-
-    // Wheel / trackpad
-    viewerShell.addEventListener("wheel", (e) => {
-      if (!canBridgeNow()) return;
-      const dy = e.deltaY || 0;
-      if (Math.abs(dy) < 4) return;
-      e.preventDefault();
-      if (dy > 0) bridgeNext();
-      else bridgePrev();
-    }, {passive:false});
-
-    // Touch (mobile)
-    viewerShell.addEventListener("touchstart", (e) => {
-      if (!canBridgeNow()) return;
-      const t = e.touches && e.touches[0];
-      if (!t) return;
-      touchStartY = t.clientY;
-    }, {passive:true});
-
-    viewerShell.addEventListener("touchmove", (e) => {
-      if (!canBridgeNow()) return;
-      // empêcher le "scroll mort" sur la cover
-      e.preventDefault();
-    }, {passive:false});
-
-    viewerShell.addEventListener("touchend", (e) => {
-      if (!canBridgeNow()) { touchStartY = null; return; }
-      if (touchStartY === null) return;
-      const t = (e.changedTouches && e.changedTouches[0]) || null;
-      if (!t) { touchStartY = null; return; }
-      const dy = touchStartY - t.clientY;
-      touchStartY = null;
-      if (Math.abs(dy) < 26) return;
-      if (dy > 0) bridgeNext();
-      else bridgePrev();
-    }, {passive:true});
-  }
-
-  // ====== REPRISE "future-proof" ======
   async function displayFromTOCOrSpine(){
     // 1) TOC (nav)
     try {
       if (book && book.navigation && Array.isArray(book.navigation.toc) && book.navigation.toc.length) {
         const toc = book.navigation.toc;
-        const firstGood = toc.find(t => t && t.href) || null;
-        if (firstGood && firstGood.href) {
-          await rendition.display(firstGood.href);
+        const first = toc.find(t => t && t.href) || null;
+        if (first && first.href) {
+          await rendition.display(first.href);
           return true;
         }
       }
@@ -1018,9 +963,144 @@ body.reader-open .footer{display:none}
       }
     } catch(e) {}
 
-    // 3) fallback epub.js
+    // 3) fallback
     try { await rendition.display(); return true; } catch(e) {}
     return false;
+  }
+
+  // ====== EDGE SCROLL BRIDGE (FIX) ======
+  let edgeBridgeInstalled = false;
+  let edgeCooldown = false;
+  let touchStartY = null;
+  const EDGE_EPS = 2;
+
+  function getActiveScrollInfo(){
+    // epub.js crée des iframes / documents internes
+    try {
+      if (!rendition || typeof rendition.getContents !== "function") return null;
+      const contents = rendition.getContents();
+      if (!contents || !contents.length) return null;
+
+      // on prend le “premier” contenu actif (suffisant en scrolled-doc)
+      const c = contents[0];
+      const doc = c && c.document ? c.document : null;
+      if (!doc) return null;
+
+      const scroller = doc.scrollingElement || doc.documentElement || doc.body;
+      if (!scroller) return null;
+
+      const st = scroller.scrollTop || 0;
+      const sh = scroller.scrollHeight || 0;
+      const ch = scroller.clientHeight || 0;
+      return { scroller, st, sh, ch };
+    } catch(e){
+      return null;
+    }
+  }
+
+  function isAtBottom(info){
+    if (!info) return true;
+    return (info.st + info.ch) >= (info.sh - EDGE_EPS);
+  }
+
+  function isAtTop(info){
+    if (!info) return true;
+    return info.st <= EDGE_EPS;
+  }
+
+  function canEdgeBridge(){
+    return !!rendition && flowMode === "scrolled-doc";
+  }
+
+  function edgeNext(){
+    if (!rendition) return;
+    if (edgeCooldown) return;
+    edgeCooldown = true;
+    setTimeout(() => { edgeCooldown = false; }, 260);
+    try { rendition.next(); } catch(e){}
+  }
+
+  function edgePrev(){
+    if (!rendition) return;
+    if (edgeCooldown) return;
+    edgeCooldown = true;
+    setTimeout(() => { edgeCooldown = false; }, 260);
+    try { rendition.prev(); } catch(e){}
+  }
+
+  function installEdgeBridge(){
+    if (edgeBridgeInstalled) return;
+    if (!viewerShell) return;
+    edgeBridgeInstalled = true;
+
+    // Wheel: ne capte QUE si (cover) ou (top/bottom atteints)
+    viewerShell.addEventListener("wheel", (e) => {
+      if (!canEdgeBridge()) return;
+
+      const dy = e.deltaY || 0;
+      if (Math.abs(dy) < 3) return;
+
+      const loc = rendition.currentLocation && rendition.currentLocation();
+      const onCover = locationLooksLikeCover(loc);
+
+      const info = getActiveScrollInfo();
+      const atBottom = isAtBottom(info);
+      const atTop = isAtTop(info);
+
+      if ((dy > 0 && (onCover || atBottom)) || (dy < 0 && (onCover || atTop))) {
+        e.preventDefault();
+        if (dy > 0) edgeNext();
+        else edgePrev();
+      }
+      // sinon, on laisse scroller normalement
+    }, {passive:false});
+
+    // Touch: on “swipe” uniquement si (cover) ou (top/bottom)
+    viewerShell.addEventListener("touchstart", (e) => {
+      if (!canEdgeBridge()) return;
+      const t = e.touches && e.touches[0];
+      if (!t) return;
+      touchStartY = t.clientY;
+    }, {passive:true});
+
+    viewerShell.addEventListener("touchmove", (e) => {
+      if (!canEdgeBridge()) return;
+
+      const loc = rendition.currentLocation && rendition.currentLocation();
+      const onCover = locationLooksLikeCover(loc);
+
+      const info = getActiveScrollInfo();
+      const atBottom = isAtBottom(info);
+      const atTop = isAtTop(info);
+
+      if (onCover || atBottom || atTop) {
+        // on évite le scroll mort / rubber band aux extrémités
+        e.preventDefault();
+      }
+    }, {passive:false});
+
+    viewerShell.addEventListener("touchend", (e) => {
+      if (!canEdgeBridge()) { touchStartY = null; return; }
+      if (touchStartY === null) return;
+
+      const t = (e.changedTouches && e.changedTouches[0]) || null;
+      if (!t) { touchStartY = null; return; }
+
+      const dy = touchStartY - t.clientY;
+      touchStartY = null;
+
+      if (Math.abs(dy) < 26) return;
+
+      const loc = rendition.currentLocation && rendition.currentLocation();
+      const onCover = locationLooksLikeCover(loc);
+
+      const info = getActiveScrollInfo();
+      const atBottom = isAtBottom(info);
+      const atTop = isAtTop(info);
+
+      if (dy > 0 && (onCover || atBottom)) edgeNext();
+      else if (dy < 0 && (onCover || atTop)) edgePrev();
+    }, {passive:true});
   }
 
   // ====== EPUB ======
@@ -1057,7 +1137,6 @@ body.reader-open .footer{display:none}
       }
       book = null;
 
-      // reset par ouverture
       langHookInstalled = false;
 
       const path = "epubs/" + item.file;
@@ -1076,8 +1155,8 @@ body.reader-open .footer{display:none}
         spread: "none"
       });
 
-      // FIX: bridge cover scroll
-      installCoverBridge();
+      // FIX: bridge edges en scrolled-doc (cover + fin de chapitre)
+      installEdgeBridge();
 
       // Applique mode par défaut (scroll) avant 1ère display
       syncModeUI();
@@ -1090,7 +1169,11 @@ body.reader-open .footer{display:none}
         if (!currentItem || !rendition) return;
         clearPosition(currentItem);
         elProgress.textContent = "Carregando…";
-        try { await displayFromTOCOrSpine(); } catch(e){}
+        try {
+          // restart = revenir à la cover si elle existe, sinon début
+          const okCover = await displayCoverFirstIfAny();
+          if (!okCover) await displayFromTOCOrSpine();
+        } catch(e){}
         applyThemeToRendition();
         await applyFlowMode(true);
       };
@@ -1132,19 +1215,25 @@ body.reader-open .footer{display:none}
 
       rendition.on("rendered", () => applyThemeToRendition());
 
-      // ===== Reprise robuste =====
+      // ===== Reprise robuste (avec cover au démarrage) =====
       if (savedCfi) {
         try {
           await rendition.display(savedCfi);
         } catch(e) {
           clearPosition(item);
           showNotice("ℹ️ Posição salva incompatível com a nova versão do EPUB. Abrindo no início…");
-          await displayFromTOCOrSpine();
+          // si position cassée: on montre la cover d’abord
+          const okCover = await displayCoverFirstIfAny();
+          if (!okCover) await displayFromTOCOrSpine();
         }
       } else {
-        const ok = await displayFromTOCOrSpine();
-        if (!ok) {
-          try { await rendition.display(); } catch(e){}
+        // IMPORTANT: ouvrir sur la cover si elle existe
+        const okCover = await displayCoverFirstIfAny();
+        if (!okCover) {
+          const ok = await displayFromTOCOrSpine();
+          if (!ok) {
+            try { await rendition.display(); } catch(e){}
+          }
         }
       }
 
