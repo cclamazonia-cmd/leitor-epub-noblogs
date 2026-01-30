@@ -21,6 +21,9 @@
   --shadow:0 10px 30px rgba(0,0,0,.08);
   --font-ui:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
   --font-reading:ui-serif,"Georgia","Times New Roman",Times,serif;
+
+  /* ===== Catalogue background (fixed, not theme-dependent) ===== */
+  --catalog-bg-url:url("https://cclamazonia.noblogs.org/files/2024/11/Arte-CCLA-paredao.jpg");
 }
 
 body.night{
@@ -40,6 +43,7 @@ body.night{
 *{box-sizing:border-box}
 html,body{height:100%}
 
+/* ===== Base page ===== */
 body{
   margin:0;
   font-family:var(--font-ui);
@@ -47,6 +51,44 @@ body{
   color:var(--fg);
   -webkit-font-smoothing:antialiased;
   text-rendering:optimizeLegibility;
+}
+
+/* ===== Catalogue-only background image (does NOT change with theme) ===== */
+/* Default state = catalogue visible, reader closed */
+body:not(.reader-open){
+  background-image: var(--catalog-bg-url);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* When reader is open: remove image and use theme background */
+body.reader-open{
+  background-image: none;
+  background: var(--bg);
+}
+
+/* ===== Make catalogue readable on top of background image ===== */
+/* A subtle overlay only for catalogue state */
+body:not(.reader-open)::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:0;
+  /* light veil that works in both day/night without changing the image */
+  background: linear-gradient(
+    to bottom,
+    rgba(255,255,255,.72),
+    rgba(255,255,255,.58)
+  );
+  pointer-events:none;
+}
+
+/* Ensure app content stays above the overlay */
+header, main, footer{
+  position:relative;
+  z-index:1;
 }
 
 header{
@@ -663,7 +705,6 @@ body.reader-open .footer{display:none}
     const align = justifyOn ? "justify" : "start";
     const hy = hyphenOn ? "auto" : "manual";
 
-    // Très agressif: override couleurs + fonds + inline styles via !important
     return `
 html, body {
   background: ${bg} !important;
@@ -695,7 +736,6 @@ img, svg, video, canvas {
   background: transparent !important;
 }
 
-/* Évite les tableaux "fond blanc" */
 table, thead, tbody, tr, td, th {
   background: transparent !important;
 }
@@ -730,7 +770,6 @@ table, thead, tbody, tr, td, th {
   function ensureHooks(){
     if (!rendition) return;
 
-    // Hook lang
     if (!langHookInstalled) {
       langHookInstalled = true;
       try {
@@ -745,7 +784,6 @@ table, thead, tbody, tr, td, th {
       } catch(e) {}
     }
 
-    // Hook hard CSS
     if (!hardCssHookInstalled) {
       hardCssHookInstalled = true;
       try {
@@ -763,7 +801,6 @@ table, thead, tbody, tr, td, th {
 
     ensureHooks();
 
-    // On garde themes (utile pour fontSize), mais la couleur finale est imposée par le hard CSS.
     const night = document.body.classList.contains("night");
     rendition.themes.register("app", {
       "a": { "color": night ? "#8ab4f8" : "#0b57d0" }
@@ -772,8 +809,6 @@ table, thead, tbody, tr, td, th {
 
     applyReadingPrefs();
     syncJustifyHyphenButtons();
-
-    // ✅ crucial: mettre à jour le <style> !important dans tous les chapitres déjà rendus
     updateAllContentsHardStyle();
 
     try { localStorage.setItem("justifyOn", justifyOn ? "1" : "0"); } catch(e) {}
@@ -887,7 +922,31 @@ table, thead, tbody, tr, td, th {
 
   function updateProgressUI(location){
     const displayed = location && location.start && location.start.displayed;
-    const percent = percentFromLocation(location);
+    const percent = (function(){
+      const displayed = location && location.start && location.start.displayed;
+
+      const p = location && location.start && location.start.percentage;
+      if (typeof p === "number" && isFinite(p)) {
+        const pp = Math.max(0, Math.min(1, p));
+        if (!(displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99)) {
+          return pp;
+        }
+      }
+
+      const cfi = location && location.start && location.start.cfi;
+      if (!cfi || !book || !book.locations || typeof book.locations.length !== "function") return null;
+      if (book.locations.length() === 0) return null;
+
+      if (typeof book.locations.percentageFromCfi === "function") {
+        const px = book.locations.percentageFromCfi(cfi);
+        if (typeof px === "number" && isFinite(px)) {
+          const pp = Math.max(0, Math.min(1, px));
+          if (displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99) return null;
+          return pp;
+        }
+      }
+      return null;
+    })();
 
     const pagePart = (displayed && displayed.page && displayed.total)
       ? `Página ${displayed.page} / ${displayed.total}`
@@ -945,7 +1004,7 @@ table, thead, tbody, tr, td, th {
     }
 
     try { rendition.spread("none"); } catch(e){}
-    try { rendition.flow(FLOW_MODE); } catch(e){}
+    try { rendition.flow("paginated"); } catch(e){}
 
     try { if (cfi) await rendition.display(cfi); } catch(e){}
     try { rendition.resize(); } catch(e){}
@@ -985,7 +1044,6 @@ table, thead, tbody, tr, td, th {
       }
       book = null;
 
-      // reset hooks par ouverture
       langHookInstalled = false;
       hardCssHookInstalled = false;
 
@@ -1001,9 +1059,7 @@ table, thead, tbody, tr, td, th {
 
       rendition = book.renderTo("viewer", { width: "100%", height: "100%", spread: "none" });
 
-      // hooks + thème
       applyThemeToRendition();
-
       await applyFlowPaginated(false);
 
       btnPrev.onclick = () => rendition && rendition.prev();
@@ -1033,7 +1089,6 @@ table, thead, tbody, tr, td, th {
       });
 
       rendition.on("rendered", () => {
-        // re-apply (certains EPUB ré-injectent leur CSS à chaque chapitre)
         applyThemeToRendition();
       });
 
