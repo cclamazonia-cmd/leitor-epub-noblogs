@@ -437,6 +437,9 @@ body.reader-open .footer{display:none}
   let saveBadgeTimer = null;
   let locReadyPromise = Promise.resolve(false);
 
+  // PATCH: évite la boucle "rendered -> theme -> re-render -> rendered"
+  let themesRegistered = false;
+
   // ====== Layout prefs ======
   let flowMode  = localStorage.getItem("flowMode") || "paginated";
   let spreadMode= localStorage.getItem("spreadMode") || "none";
@@ -742,24 +745,41 @@ body.reader-open .footer{display:none}
     syncLayoutButtons();
   }
 
+  // PATCH: thème stable (register 1x) + select day/night (évite la boucle "rendered")
   function applyThemeToRendition() {
     if (!rendition) return;
 
     const night = document.body.classList.contains("night");
 
-    rendition.themes.register("app", {
-      "body": {
-        "background": night ? "#0f1115" : "#ffffff",
-        "color": night ? "#e9edf1" : "#111111",
-        "line-height": "1.65",
-        "text-rendering": "optimizeLegibility"
-      },
-      "p": { "line-height": "1.65", "margin": "0 0 1em 0" },
-      "h1,h2,h3": { "line-height": "1.25", "margin": "1.2em 0 .6em 0" },
-      "a": { "color": night ? "#8ab4f8" : "#0b57d0" }
-    });
+    if (!themesRegistered) {
+      rendition.themes.register("day", {
+        "body": {
+          "background": "#ffffff",
+          "color": "#111111",
+          "line-height": "1.65",
+          "text-rendering": "optimizeLegibility"
+        },
+        "p": { "line-height": "1.65", "margin": "0 0 1em 0" },
+        "h1,h2,h3": { "line-height": "1.25", "margin": "1.2em 0 .6em 0" },
+        "a": { "color": "#0b57d0" }
+      });
 
-    rendition.themes.select("app");
+      rendition.themes.register("night", {
+        "body": {
+          "background": "#0f1115",
+          "color": "#e9edf1",
+          "line-height": "1.65",
+          "text-rendering": "optimizeLegibility"
+        },
+        "p": { "line-height": "1.65", "margin": "0 0 1em 0" },
+        "h1,h2,h3": { "line-height": "1.25", "margin": "1.2em 0 .6em 0" },
+        "a": { "color": "#8ab4f8" }
+      });
+
+      themesRegistered = true;
+    }
+
+    try { rendition.themes.select(night ? "night" : "day"); } catch(e) {}
 
     applyReadingPrefs();
     applyLayoutPrefs();
@@ -915,7 +935,8 @@ body.reader-open .footer{display:none}
 
       rendition = book.renderTo("viewer", { width: "100%", height: "100%", spread: "none" });
 
-      rendition.on("rendered", () => applyThemeToRendition());
+      // PATCH: on SUPPRIME le handler "rendered" qui créait la boucle de re-render.
+      // rendition.on("rendered", () => applyThemeToRendition());
 
       btnPrev.onclick = () => rendition && rendition.prev();
       btnNext.onclick = () => rendition && rendition.next();
@@ -955,6 +976,7 @@ body.reader-open .footer{display:none}
       if (savedCfi) await rendition.display(savedCfi);
       else await rendition.display();
 
+      // On applique le thème UNE FOIS après display() (puis il persiste)
       applyThemeToRendition();
       syncLayoutButtons();
 
