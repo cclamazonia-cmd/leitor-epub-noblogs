@@ -268,10 +268,13 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
 }
 .save-badge.show{opacity:1;transform:translateY(0)}
 
+/* IMPORTANT: rendre le viewer scrollable */
 #viewer{
   width:100%;
   height: calc(100vh - 280px);
   background:var(--bg);
+  overflow-y:auto;   /* <-- CRUCIAL */
+  overflow-x:hidden; /* <-- évite le scroll horizontal */
 }
 
 /* Toolbar responsive */
@@ -430,6 +433,9 @@ body.reader-open .footer{display:none}
 (() => {
   "use strict";
 
+  // ====== Option B: notices désactivées par défaut ======
+  const DEBUG_NOTICES = false;
+
   // ====== CONFIG ======
   const BOOKS = [
     { id: "extrativismo", title: "Extrativismo", author: "Anna Bednik e Jérémy Dotti", file: "extrativismo.epub", cover: "assets/covers/capa-extrativismo.jpg", nudge: false },
@@ -452,10 +458,12 @@ body.reader-open .footer{display:none}
   const btnFontMinus = document.getElementById("fontMinus");
   const btnFontPlus  = document.getElementById("fontPlus");
 
+  // Fullscreen
   const viewerShell = document.getElementById("viewerShell");
   const btnFs = document.getElementById("fsBtn");
   const btnFsExit = document.getElementById("fsExitBtn");
 
+  // Layout controls
   const btnMargin = document.getElementById("marginBtn");
   const btnWidth  = document.getElementById("widthBtn");
   const btnJustify= document.getElementById("justifyBtn");
@@ -496,6 +504,7 @@ body.reader-open .footer{display:none}
   }
 
   function showNotice(message) {
+    if (!DEBUG_NOTICES) return;
     elError.style.display = "block";
     elError.innerHTML = escapeHtml(message).replace(/\n/g, "<br>");
   }
@@ -881,75 +890,53 @@ p,li,blockquote,div,section,article{
     }, {passive:true});
   });
 
-  // ===== START TARGET (TOC-first, then spine) =====
-  async function firstTocHref(){
-    try{
-      const nav = await book.loaded.navigation;
-      const toc = nav && nav.toc ? nav.toc : (book.navigation && book.navigation.toc ? book.navigation.toc : []);
-      if (!toc || !toc.length) return null;
-      const href = String(toc[0].href || "").trim();
-      return href || null;
-    } catch(e){
-      return null;
-    }
-  }
-
-  function looksLikeCoverSpineItem(spineItem){
-    if (!spineItem) return true;
-    const href = String(spineItem.href || "").toLowerCase();
-    const id = String(spineItem.idref || spineItem.id || "").toLowerCase();
-    const props = String(spineItem.properties || "").toLowerCase();
-    if (props.includes("cover")) return true;
-    if (href.includes("cover")) return true;
-    if (id.includes("cover")) return true;
-    if (href.includes("titlepage") || id.includes("titlepage")) return true;
-    return false;
-  }
-
-  function firstReadableSpineItem(){
-    if (!book || !book.spine || !book.spine.items) return null;
-    const items = book.spine.items;
-    for (const it of items) {
-      const linear = String(it.linear || "yes").toLowerCase();
-      if (linear === "no") continue;
-      if (looksLikeCoverSpineItem(it)) continue;
-      return it;
-    }
-    for (const it of items) {
-      const linear = String(it.linear || "yes").toLowerCase();
-      if (linear === "no") continue;
-      return it;
-    }
-    return items[0] || null;
-  }
-
+  // ===== START TARGET: anti-cover solide (TOC puis spine) =====
   async function displayStart(item){
+    // 1) Position sauvegardée
     const savedCfi = loadPosition(item);
     if (savedCfi) {
       try { await rendition.display(savedCfi); return true; } catch(e){}
     }
 
-    const tocHref = await firstTocHref();
-    if (tocHref) {
-      try { await rendition.display(tocHref); return true; } catch(e){}
-    }
+    // 2) TOC: premier item non-cover
+    try{
+      const nav = await book.loaded.navigation;
+      const toc = nav && nav.toc ? nav.toc : [];
+      for (const entry of toc) {
+        if (!entry || !entry.href) continue;
+        const href = String(entry.href).toLowerCase();
+        if (href.includes("cover") || href.includes("titlepage")) continue;
+        await rendition.display(entry.href);
+        return true;
+      }
+    } catch(e){}
 
-    const it = firstReadableSpineItem();
-    if (it) {
-      try { await rendition.display(it.href); return true; } catch(e){}
-    }
+    // 3) Spine: premier item linéaire non-cover
+    try{
+      const items = (book && book.spine && book.spine.items) ? book.spine.items : [];
+      for (const it of items) {
+        if (!it || !it.href) continue;
+        const href = String(it.href).toLowerCase();
+        const linear = String(it.linear || "yes").toLowerCase();
+        if (linear === "no") continue;
+        if (href.includes("cover") || href.includes("titlepage")) continue;
+        await rendition.display(it.href);
+        return true;
+      }
+    } catch(e){}
 
+    // 4) Ultime fallback
     try { await rendition.display(); return true; } catch(e){}
     return false;
   }
 
   async function safeNudge(item){
     if (!rendition) return;
-    try { rendition.resize(); } catch(e) {}
+    try { rendition.resize(); } catch(e){}
     await new Promise(r => setTimeout(r, 80));
     await displayStart(item);
     await new Promise(r => setTimeout(r, 80));
-    try { rendition.resize(); } catch(e) {}
+    try { rendition.resize(); } catch(e){}
   }
 
   async function openBook(item) {
@@ -989,9 +976,9 @@ p,li,blockquote,div,section,article{
 
       rendition = book.renderTo("viewer", { width: "100%", height: "100%", spread: "none" });
 
-      // Mode unique
-      try { rendition.flow("scrolled-doc"); } catch(e) {}
-      try { rendition.spread("none"); } catch(e) {}
+      // IMPORTANT: forcer le mode scroll AVANT tout display()
+      try { rendition.flow("scrolled-doc"); } catch(e){}
+      try { rendition.spread("none"); } catch(e){}
 
       rendition.on("relocated", (location) => {
         savePosition(item, location);
@@ -1019,18 +1006,16 @@ p,li,blockquote,div,section,article{
       btnJustify.onclick= () => { justifyOn = !justifyOn; applyLayoutPrefs(); };
       btnHyphen.onclick = () => { hyphenOn = !hyphenOn; applyLayoutPrefs(); };
 
-      // Display initial (TOC-first)
+      // Display initial (anti-cover)
       const ok = await displayStart(item);
-      if (!ok) {
-        showError("Não consegui exibir um capítulo legível (TOC/spine).");
-      }
+      if (!ok) showError("Não consegui exibir um capítulo legível (TOC/spine).");
 
       applyThemeToRendition();
       syncLayoutButtons();
 
       if (item.nudge) await safeNudge(item);
 
-      showNotice("ℹ️ Leitura em rolagem (scroll) ativada. Entrada prioriza o sumário (TOC).");
+      showNotice("DEBUG: scroll ok, start via TOC/spine ok.");
 
     } catch (err) {
       console.error(err);
