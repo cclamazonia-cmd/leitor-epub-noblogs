@@ -174,11 +174,20 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
 .viewer-hint{
   color:var(--muted);
   font-size:13px;
-  min-width: 150px;
+  min-width: 180px;
   text-align:center;
 }
 
-/* Badge “saved” */
+.pill{
+  font-size:12px;
+  color:var(--muted);
+  padding:6px 10px;
+  border:1px solid var(--border);
+  border-radius:999px;
+  background:color-mix(in srgb, var(--bg) 70%, var(--card));
+  white-space:nowrap;
+}
+
 .save-badge{
   font-size:12px;
   color:var(--muted);
@@ -191,10 +200,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   transition:opacity .18s ease, transform .18s ease;
   white-space:nowrap;
 }
-.save-badge.show{
-  opacity:1;
-  transform:translateY(0);
-}
+.save-badge.show{opacity:1;transform:translateY(0)}
 
 #viewer{
   width:100%;
@@ -219,7 +225,6 @@ code{
   color:var(--fg);
 }
 
-/* ===== Footer logo (Biblioteca) ===== */
 .footer{
   display:flex;
   justify-content:center;
@@ -241,16 +246,12 @@ body.reader-open .footer{display:none}
 </header>
 
 <main>
-
-  <!-- CATALOGO -->
   <section id="catalogo" class="card">
     <h2>Catálogo</h2>
     <p>Escolha um livro para abrir no leitor.</p>
-
     <div id="books"></div>
   </section>
 
-  <!-- LEITOR -->
   <section id="leitor" class="card" style="display:none;">
     <div class="reader-top">
       <button class="btn" id="backBtn" type="button">← Catálogo</button>
@@ -271,6 +272,7 @@ body.reader-open .footer{display:none}
         </div>
 
         <div class="viewer-right">
+          <span class="pill" id="timePill" aria-label="Tempo de leitura">Tempo: 00:00</span>
           <span class="save-badge" id="saveBadge" aria-live="polite">Última leitura salva ✅</span>
           <button class="btn" id="nextBtn" type="button" aria-label="Próxima página">→</button>
         </div>
@@ -281,7 +283,6 @@ body.reader-open .footer{display:none}
 
     <div id="errorBox" class="notice" style="display:none;"></div>
   </section>
-
 </main>
 
 <footer class="footer" aria-label="Editora CCLA">
@@ -308,6 +309,7 @@ body.reader-open .footer{display:none}
   const elProgress = document.getElementById("progress");
   const elError = document.getElementById("errorBox");
   const elSaveBadge = document.getElementById("saveBadge");
+  const elTimePill = document.getElementById("timePill");
 
   const btnNight = document.getElementById("toggleNight");
   const btnBack = document.getElementById("backBtn");
@@ -322,11 +324,20 @@ body.reader-open .footer{display:none}
   let rendition = null;
   let currentItem = null;
 
-  // Taille de police (EPUB) persistée
-  let fontPct = Number(localStorage.getItem("fontPct") || 110); // 110% défaut
+  // Font size persisted
+  let fontPct = Number(localStorage.getItem("fontPct") || 110);
 
   // Badge timer
   let saveBadgeTimer = null;
+
+  // Progress %: locations readiness
+  let locReadyPromise = Promise.resolve(false);
+
+  // ====== TIMER (robuste, tranche 30s, basé sur temps réel actif) =====
+  let readingSeconds = 0;        // temps sauvegardé (multiple de 30)
+  let readingTickId = null;      // interval UI + calcul
+  let activeStartMs = null;      // moment où la session active a commencé (ms)
+  let activeCarryMs = 0;         // ms actifs accumulés mais pas encore convertis en 30s
 
   // ====== UTIL ======
   function escapeHtml(value) {
@@ -364,11 +375,18 @@ body.reader-open .footer{display:none}
     saveBadgeTimer = setTimeout(() => elSaveBadge.classList.remove("show"), 1400);
   }
 
-  // ====== PROGRESS SAVE (CFI) ======
+  // ====== STORAGE KEYS ======
   function storageKeyForBook(item) {
     return "pos:" + (item && item.id ? item.id : "unknown");
   }
+  function timeKeyForBook(item) {
+    return "time:" + (item && item.id ? item.id : "unknown");
+  }
+  function locKeyForBook(item){
+    return "loc:" + (item && item.id ? item.id : "unknown");
+  }
 
+  // ====== POSITION SAVE/LOAD (CFI) ======
   function savePosition(item, location) {
     try {
       const cfi = location && location.start && location.start.cfi;
@@ -379,18 +397,175 @@ body.reader-open .footer{display:none}
   }
 
   function loadPosition(item) {
-    try {
-      return localStorage.getItem(storageKeyForBook(item));
-    } catch(e) {
-      return null;
-    }
+    try { return localStorage.getItem(storageKeyForBook(item)); }
+    catch(e){ return null; }
   }
 
   function clearPosition(item) {
-    try {
-      localStorage.removeItem(storageKeyForBook(item));
-    } catch(e) { /* ignore */ }
+    try { localStorage.removeItem(storageKeyForBook(item)); }
+    catch(e){ /* ignore */ }
   }
+
+  // ====== LOCATIONS (for % progress) ======
+  async function ensureLocations(item){
+    if (!book || !book.locations) return false;
+
+    try {
+      if (book.ready) await book.ready;
+
+      if (typeof book.locations.length === "function" && book.locations.length() > 0) return true;
+
+      const saved = localStorage.getItem(locKeyForBook(item));
+      if (saved) {
+        book.locations.load(saved);
+        if (book.locations.length() > 0) return true;
+      }
+
+      await book.locations.generate(1024);
+
+      try {
+        localStorage.setItem(locKeyForBook(item), book.locations.save());
+      } catch(e) { /* ignore quota */ }
+
+      return (typeof book.locations.length === "function" && book.locations.length() > 0);
+    } catch(e) {
+      return false;
+    }
+  }
+
+  function percentFromLocation(location){
+    const displayed = location && location.start && location.start.displayed;
+
+    const p = location && location.start && location.start.percentage;
+    if (typeof p === "number" && isFinite(p)) {
+      const pp = Math.max(0, Math.min(1, p));
+      if (displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99) {
+        // ignore degenerate
+      } else {
+        return pp;
+      }
+    }
+
+    const cfi = location && location.start && location.start.cfi;
+    if (!cfi || !book || !book.locations || typeof book.locations.length !== "function") return null;
+    if (book.locations.length() === 0) return null;
+
+    if (typeof book.locations.percentageFromCfi === "function") {
+      const px = book.locations.percentageFromCfi(cfi);
+      if (typeof px === "number" && isFinite(px)) {
+        const pp = Math.max(0, Math.min(1, px));
+        if (displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99) {
+          return null;
+        }
+        return pp;
+      }
+    }
+
+    return null;
+  }
+
+  // ====== TIMER (robuste) ======
+  function isReadingActive(){
+    return document.body.classList.contains("reader-open")
+      && document.visibilityState === "visible"
+      && !!currentItem;
+  }
+
+  function nowMs(){
+    return (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+  }
+
+  function loadReadingTime(item){
+    try {
+      const v = Number(localStorage.getItem(timeKeyForBook(item)) || 0);
+      return Number.isFinite(v) && v >= 0 ? v : 0;
+    } catch(e){
+      return 0;
+    }
+  }
+
+  function saveReadingTime(item){
+    try {
+      localStorage.setItem(timeKeyForBook(item), String(readingSeconds));
+    } catch(e){ /* ignore */ }
+  }
+
+  function formatTime(sec){
+    const s = Math.max(0, Math.floor(sec));
+    const mm = Math.floor(s / 60);
+    const ss = s % 60;
+    return `${String(mm).padStart(2,"0")}:${String(ss).padStart(2,"0")}`;
+  }
+
+  function updateTimeUI(){
+    if (!elTimePill) return;
+    elTimePill.textContent = `Tempo: ${formatTime(readingSeconds)}`;
+  }
+
+  function syncActiveState(){
+    const active = isReadingActive();
+    const t = nowMs();
+
+    if (active && activeStartMs === null) {
+      activeStartMs = t;
+      return;
+    }
+
+    if (!active && activeStartMs !== null) {
+      activeCarryMs += (t - activeStartMs);
+      activeStartMs = null;
+    }
+  }
+
+  function commitActiveTime(){
+    const t = nowMs();
+
+    if (activeStartMs !== null) {
+      activeCarryMs += (t - activeStartMs);
+      activeStartMs = t;
+    }
+
+    const chunkMs = 30000;
+    const chunks = Math.floor(activeCarryMs / chunkMs);
+
+    if (chunks > 0) {
+      readingSeconds += chunks * 30;
+      activeCarryMs -= chunks * chunkMs;
+      if (currentItem) saveReadingTime(currentItem);
+      updateTimeUI();
+    }
+  }
+
+  function startReadingTimer(){
+    stopReadingTimer();
+    activeStartMs = null;
+    activeCarryMs = 0;
+
+    syncActiveState();
+    updateTimeUI();
+
+    readingTickId = setInterval(() => {
+      syncActiveState();
+      commitActiveTime();
+    }, 1000);
+  }
+
+  function stopReadingTimer(){
+    if (readingTickId) clearInterval(readingTickId);
+    readingTickId = null;
+
+    syncActiveState();
+    commitActiveTime();
+
+    activeStartMs = null;
+    activeCarryMs = 0;
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    syncActiveState();
+    commitActiveTime();
+    updateTimeUI();
+  });
 
   // ====== READING PREFS ======
   function applyReadingPrefs() {
@@ -398,9 +573,7 @@ body.reader-open .footer{display:none}
     try {
       rendition.themes.fontSize(fontPct + "%");
       localStorage.setItem("fontPct", String(fontPct));
-    } catch(e) {
-      // ignore
-    }
+    } catch(e) { /* ignore */ }
   }
 
   // ====== THEME ======
@@ -416,29 +589,18 @@ body.reader-open .footer{display:none}
         "line-height": "1.65",
         "text-rendering": "optimizeLegibility"
       },
-      "p": {
-        "line-height": "1.65",
-        "margin": "0 0 1em 0"
-      },
-      "h1,h2,h3": {
-        "line-height": "1.25",
-        "margin": "1.2em 0 .6em 0"
-      },
-      "a": {
-        "color": night ? "#8ab4f8" : "#0b57d0"
-      }
+      "p": { "line-height": "1.65", "margin": "0 0 1em 0" },
+      "h1,h2,h3": { "line-height": "1.25", "margin": "1.2em 0 .6em 0" },
+      "a": { "color": night ? "#8ab4f8" : "#0b57d0" }
     });
 
     rendition.themes.select("app");
 
-    // Marges de lecture
     try {
       rendition.themes.override("body", "padding", "18px 18px 24px 18px");
       rendition.themes.override("body", "margin", "0");
       rendition.themes.override("html", "margin", "0");
-    } catch(e) {
-      // ignore
-    }
+    } catch(e) { /* ignore */ }
 
     applyReadingPrefs();
   }
@@ -454,9 +616,7 @@ body.reader-open .footer{display:none}
   function initTheme() {
     const saved = localStorage.getItem("theme");
     setTheme(saved === "night");
-    btnNight.addEventListener("click", () => {
-      setTheme(!document.body.classList.contains("night"));
-    });
+    btnNight.addEventListener("click", () => setTheme(!document.body.classList.contains("night")));
   }
 
   // ====== UI ======
@@ -492,11 +652,28 @@ body.reader-open .footer{display:none}
     });
   }
 
+  function updateProgressUI(location){
+    const displayed = location && location.start && location.start.displayed;
+    const percent = percentFromLocation(location);
+
+    const pagePart = (displayed && displayed.page && displayed.total)
+      ? `Página ${displayed.page} / ${displayed.total}`
+      : "—";
+
+    const pctPart = (percent !== null)
+      ? ` • ${Math.round(percent * 100)}%`
+      : "";
+
+    elProgress.textContent = pagePart + pctPart;
+  }
+
   // ====== EPUB ======
   async function openBook(item) {
     clearError();
 
     currentItem = item;
+    readingSeconds = loadReadingTime(item);
+    updateTimeUI();
 
     showReader();
     elTitle.textContent = item.title || "Livro";
@@ -504,6 +681,8 @@ body.reader-open .footer{display:none}
     const savedCfi = loadPosition(item);
     elProgress.textContent = savedCfi ? "Retomando…" : "Carregando…";
     if (elSaveBadge) elSaveBadge.classList.remove("show");
+
+    startReadingTimer();
 
     if (typeof window.ePub !== "function") {
       showError(
@@ -530,6 +709,9 @@ body.reader-open .footer{display:none}
 
       book = window.ePub(arrayBuffer);
 
+      // prepare locations for % progress (wait for book.ready, cache)
+      locReadyPromise = (book.ready ? book.ready.then(() => ensureLocations(item)) : ensureLocations(item));
+
       rendition = book.renderTo("viewer", {
         width: "100%",
         height: "100%",
@@ -539,19 +721,13 @@ body.reader-open .footer{display:none}
       btnPrev.onclick = () => rendition && rendition.prev();
       btnNext.onclick = () => rendition && rendition.next();
 
-      // Recomeçar (efface position + restart)
       btnRestart.onclick = async () => {
         if (!currentItem || !rendition) return;
         clearPosition(currentItem);
         elProgress.textContent = "Carregando…";
-        try {
-          await rendition.display(); // début
-        } catch(e) {
-          // ignore
-        }
+        try { await rendition.display(); } catch(e) {}
       };
 
-      // Font controls
       btnFontMinus.onclick = () => {
         fontPct = Math.max(80, fontPct - 10);
         applyReadingPrefs();
@@ -562,20 +738,12 @@ body.reader-open .footer{display:none}
       };
 
       rendition.on("relocated", (location) => {
-        // Sauvegarde automatique de la position
         savePosition(item, location);
-
-        const displayed = location && location.start && location.start.displayed;
-        if (displayed && displayed.page && displayed.total) {
-          elProgress.textContent = `Página ${displayed.page} / ${displayed.total}`;
-        } else {
-          elProgress.textContent = "—";
-        }
+        updateProgressUI(location);
       });
 
       rendition.on("rendered", () => applyThemeToRendition());
 
-      // Restauration position si existante
       if (savedCfi) {
         await rendition.display(savedCfi);
       } else {
@@ -583,6 +751,14 @@ body.reader-open .footer{display:none}
       }
 
       applyThemeToRendition();
+
+      // Ensure locations ready then force a first % update
+      try {
+        await locReadyPromise;
+        const loc = rendition && rendition.currentLocation ? rendition.currentLocation() : null;
+        if (loc) updateProgressUI(loc);
+      } catch(e) { /* ignore */ }
+
     } catch (err) {
       console.error(err);
       showError(
@@ -595,6 +771,7 @@ body.reader-open .footer{display:none}
 
   btnBack.addEventListener("click", () => {
     clearError();
+    stopReadingTimer();
     showCatalog();
   });
 
