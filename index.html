@@ -380,11 +380,14 @@ body.reader-open .footer{display:none}
 (() => {
   "use strict";
 
+  // ====== CONFIG ======
+  // pagination: on la désactive par livre si elle est instable
   const BOOKS = [
-    { id: "extrativismo", title: "Extrativismo", author: "Anna Bednik e Jérémy Dotti", file: "extrativismo.epub" },
-    { id: "geografia-libertaria", title: "Por uma Geografia libertária", author: "Marcelo Lopes de Souza", file: "mls.epub" }
+    { id: "extrativismo", title: "Extrativismo", author: "Anna Bednik e Jérémy Dotti", file: "extrativismo.epub", pagination: false, nudge: false },
+    { id: "geografia-libertaria", title: "Por uma Geografia libertária", author: "Marcelo Lopes de Souza", file: "mls.epub", pagination: false, nudge: true }
   ];
 
+  // ====== DOM ======
   const elCatalogo = document.getElementById("catalogo");
   const elLeitor = document.getElementById("leitor");
   const elBooks = document.getElementById("books");
@@ -402,10 +405,12 @@ body.reader-open .footer{display:none}
   const btnFontMinus = document.getElementById("fontMinus");
   const btnFontPlus  = document.getElementById("fontPlus");
 
+  // Fullscreen
   const viewerShell = document.getElementById("viewerShell");
   const btnFs = document.getElementById("fsBtn");
   const btnFsExit = document.getElementById("fsExitBtn");
 
+  // Layout controls
   const btnFlow   = document.getElementById("flowBtn");
   const btnSpread = document.getElementById("spreadBtn");
   const btnMargin = document.getElementById("marginBtn");
@@ -413,6 +418,7 @@ body.reader-open .footer{display:none}
   const btnJustify= document.getElementById("justifyBtn");
   const btnHyphen = document.getElementById("hyphenBtn");
 
+  // ====== STATE ======
   let book = null;
   let rendition = null;
   let currentItem = null;
@@ -420,13 +426,12 @@ body.reader-open .footer{display:none}
   let fontPct = Number(localStorage.getItem("fontPct") || 110);
 
   let saveBadgeTimer = null;
-  let locReadyPromise = Promise.resolve(false);
 
-  // Layout prefs (valeurs epub.js valides)
-  let flowMode   = localStorage.getItem("flowMode") || "paginated";     // paginated | scrolled-doc
-  if (flowMode !== "paginated" && flowMode !== "scrolled-doc") flowMode = "paginated";
+  // Layout prefs
+  let flowMode   = localStorage.getItem("flowMode") || "scrolled-doc"; // default plus stable
+  if (flowMode !== "paginated" && flowMode !== "scrolled-doc") flowMode = "scrolled-doc";
 
-  let spreadMode = localStorage.getItem("spreadMode") || "none";        // none | auto
+  let spreadMode = localStorage.getItem("spreadMode") || "none";
   if (spreadMode !== "none" && spreadMode !== "auto") spreadMode = "none";
 
   let marginPx   = Number(localStorage.getItem("marginPx") || 18);
@@ -438,14 +443,14 @@ body.reader-open .footer{display:none}
   const MARGIN_STEPS = [12,18,24,30];
   const WIDTH_STEPS  = [0,60,72,84];
 
-  // Timer lecture (inchangé)
+  // Timer lecture
   let readingSeconds = 0;
   let rafId = null;
   let lastTs = null;
   let carryMs = 0;
   const CHUNK_MS = 30000;
 
-  // CSS injecté dans l'iframe (justification robuste)
+  // CSS injecté
   let injectedCss = "";
   let hookInstalled = false;
 
@@ -455,12 +460,12 @@ body.reader-open .footer{display:none}
     }[m]));
   }
 
-  function showError(message) {
+  function showNotice(message) {
     elError.style.display = "block";
     elError.innerHTML = escapeHtml(message).replace(/\n/g, "<br>");
   }
 
-  function showNotice(message) {
+  function showError(message) {
     elError.style.display = "block";
     elError.innerHTML = escapeHtml(message).replace(/\n/g, "<br>");
   }
@@ -581,11 +586,6 @@ body.reader-open .footer{display:none}
     lastTs = null;
   }
 
-  document.addEventListener("visibilitychange", () => {
-    lastTs = null;
-    updateTimeUI();
-  });
-
   window.addEventListener("pagehide", () => {
     if (currentItem) saveReadingTime(currentItem);
   });
@@ -618,7 +618,7 @@ body.reader-open .footer{display:none}
   function labelHyphen(){ return hyphenOn ? "Hy✓" : "Hy"; }
 
   function syncLayoutButtons(){
-    if (btnFlow)   btnFlow.textContent = labelFlow();
+    if (btnFlow) btnFlow.textContent = labelFlow();
     if (btnSpread) {
       btnSpread.textContent = `Col ${labelSpread()}`;
       btnSpread.disabled = (flowMode !== "paginated");
@@ -644,7 +644,9 @@ body.reader-open .footer{display:none}
     const gap = `${columnGap}px`;
 
     return `
-html,body{margin:0 !important;}
+/* force langue: essentiel pour l'hyphénation CSS dans les navigateurs qui la supportent */
+html{ -webkit-text-size-adjust:100%; }
+html,body{ margin:0 !important; }
 body{
   background:${night ? "#0f1115" : "#ffffff"} !important;
   color:${night ? "#e9edf1" : "#111111"} !important;
@@ -654,17 +656,23 @@ body{
   margin-left:${mx} !important;
   margin-right:${mx} !important;
   column-gap:${gap} !important;
+
   hyphens:${hy} !important;
   -webkit-hyphens:${hy} !important;
+  -ms-hyphens:${hy} !important;
+
   overflow-wrap:break-word !important;
   word-break:normal !important;
 }
-a{color:${night ? "#8ab4f8" : "#0b57d0"} !important;}
-/* justification robuste (couvre les EPUB qui n'utilisent pas <p>) */
+
+a{ color:${night ? "#8ab4f8" : "#0b57d0"} !important; }
+
+/* justification robuste */
 p,li,blockquote,div,section,article{
   text-align:${align} !important;
   hyphens:${hy} !important;
   -webkit-hyphens:${hy} !important;
+  -ms-hyphens:${hy} !important;
 }
 `;
   }
@@ -677,6 +685,11 @@ p,li,blockquote,div,section,article{
       try{
         const doc = contents.document;
         if (!doc) return;
+
+        // PATCH hyphens: force lang=pt-BR si absent
+        if (!doc.documentElement.getAttribute("lang")) doc.documentElement.setAttribute("lang","pt-BR");
+        if (doc.body && !doc.body.getAttribute("lang")) doc.body.setAttribute("lang","pt-BR");
+
         let style = doc.getElementById("ccla-app-overrides");
         if (!style) {
           style = doc.createElement("style");
@@ -700,6 +713,10 @@ p,li,blockquote,div,section,article{
           try{
             const doc = v.document;
             if (!doc) return;
+
+            if (!doc.documentElement.getAttribute("lang")) doc.documentElement.setAttribute("lang","pt-BR");
+            if (doc.body && !doc.body.getAttribute("lang")) doc.body.setAttribute("lang","pt-BR");
+
             let style = doc.getElementById("ccla-app-overrides");
             if (!style) {
               style = doc.createElement("style");
@@ -717,6 +734,7 @@ p,li,blockquote,div,section,article{
   function applyLayoutPrefs(){
     if (!rendition) return;
 
+    // flow/spread
     try { rendition.flow(flowMode); } catch(e) {}
     const effectiveSpread = (flowMode === "paginated") ? spreadMode : "none";
     try { rendition.spread(effectiveSpread); } catch(e) {}
@@ -726,84 +744,6 @@ p,li,blockquote,div,section,article{
 
     refreshInjectedCss();
     try { rendition.resize(); } catch(e) {}
-  }
-
-  // ===== FIX COVER-LOCK (mls.epub figé couverture) =====
-
-  function looksLikeCoverSpineItem(spineItem){
-    if (!spineItem) return true;
-    const href = String(spineItem.href || "").toLowerCase();
-    const id = String(spineItem.idref || spineItem.id || "").toLowerCase();
-    const props = String(spineItem.properties || "").toLowerCase();
-    // heuristiques
-    if (props.includes("cover")) return true;
-    if (href.includes("cover")) return true;
-    if (id.includes("cover")) return true;
-    // certains EPUB: "titlepage"
-    if (href.includes("titlepage") || id.includes("titlepage")) return true;
-    return false;
-  }
-
-  function firstReadableSpineItem(){
-    if (!book || !book.spine || !book.spine.items) return null;
-    const items = book.spine.items;
-    // 1) premier item linéaire non-cover
-    for (const it of items) {
-      const linear = String(it.linear || "yes").toLowerCase();
-      if (linear === "no") continue;
-      if (looksLikeCoverSpineItem(it)) continue;
-      return it;
-    }
-    // 2) sinon: premier linéaire même si cover
-    for (const it of items) {
-      const linear = String(it.linear || "yes").toLowerCase();
-      if (linear === "no") continue;
-      return it;
-    }
-    // 3) fallback: le tout premier
-    return items[0] || null;
-  }
-
-  async function displayFirstReadable(){
-    const it = firstReadableSpineItem();
-    if (!it || !rendition) return false;
-    try{
-      await rendition.display(it.href);
-      return true;
-    } catch(e){
-      return false;
-    }
-  }
-
-  async function ensureNotStuckOnCover(){
-    if (!book || !rendition) return;
-
-    // attend un peu que l'iframe soit en place
-    await new Promise(r => setTimeout(r, 150));
-
-    try{
-      const loc = rendition.currentLocation ? rendition.currentLocation() : null;
-      const hrefNow =
-        loc && loc.start && loc.start.href ? String(loc.start.href).toLowerCase() :
-        (rendition.location && rendition.location.start && rendition.location.start.href ? String(rendition.location.start.href).toLowerCase() : "");
-
-      // si on est sur cover/titlepage => saute au premier chapitre
-      if (hrefNow.includes("cover") || hrefNow.includes("titlepage")) {
-        const ok = await displayFirstReadable();
-        if (ok) return;
-      }
-
-      // sécurité: si c'est une image pleine page sans scroll et que next ne bouge pas, on force
-      const before = hrefNow;
-      try { await rendition.next(); } catch(e){}
-      await new Promise(r => setTimeout(r, 120));
-      const loc2 = rendition.currentLocation ? rendition.currentLocation() : null;
-      const href2 = loc2 && loc2.start && loc2.start.href ? String(loc2.start.href).toLowerCase() : "";
-
-      if (before && href2 && before === href2 && (before.includes("cover") || before.includes("titlepage"))) {
-        await displayFirstReadable();
-      }
-    } catch(e){}
   }
 
   function applyThemeToRendition(){
@@ -857,7 +797,7 @@ p,li,blockquote,div,section,article{
     elProgress.textContent = pagePart;
   }
 
-  // Fullscreen
+  // ===== FULLSCREEN =====
   function isFullscreen(){ return !!document.fullscreenElement; }
 
   function showFsExitTemporarily(){
@@ -890,18 +830,64 @@ p,li,blockquote,div,section,article{
     else if (btnFsExit) btnFsExit.classList.remove("show");
   });
 
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && isFullscreen()) exitFullscreen();
-  });
-
   ["mousemove","touchstart","click"].forEach(evt => {
     viewerShell && viewerShell.addEventListener(evt, () => {
       if (isFullscreen()) showFsExitTemporarily();
     }, {passive:true});
   });
 
+  // ===== COVER-LOCK FIX (comme avant) =====
+  function looksLikeCoverSpineItem(spineItem){
+    if (!spineItem) return true;
+    const href = String(spineItem.href || "").toLowerCase();
+    const id = String(spineItem.idref || spineItem.id || "").toLowerCase();
+    const props = String(spineItem.properties || "").toLowerCase();
+    if (props.includes("cover")) return true;
+    if (href.includes("cover")) return true;
+    if (id.includes("cover")) return true;
+    if (href.includes("titlepage") || id.includes("titlepage")) return true;
+    return false;
+  }
+
+  function firstReadableSpineItem(){
+    if (!book || !book.spine || !book.spine.items) return null;
+    const items = book.spine.items;
+    for (const it of items) {
+      const linear = String(it.linear || "yes").toLowerCase();
+      if (linear === "no") continue;
+      if (looksLikeCoverSpineItem(it)) continue;
+      return it;
+    }
+    for (const it of items) {
+      const linear = String(it.linear || "yes").toLowerCase();
+      if (linear === "no") continue;
+      return it;
+    }
+    return items[0] || null;
+  }
+
+  async function displayFirstReadable(){
+    const it = firstReadableSpineItem();
+    if (!it || !rendition) return false;
+    try{ await rendition.display(it.href); return true; }
+    catch(e){ return false; }
+  }
+
+  // Nudge: “réveille” certains EPUB qui n’affichent qu’après next/prev
+  async function nudgeRendition(){
+    if (!rendition) return;
+    try { rendition.resize(); } catch(e) {}
+    await new Promise(r => setTimeout(r, 80));
+    try { await rendition.next(); } catch(e) {}
+    await new Promise(r => setTimeout(r, 80));
+    try { await rendition.prev(); } catch(e) {}
+    await new Promise(r => setTimeout(r, 80));
+    try { rendition.resize(); } catch(e) {}
+  }
+
   async function openBook(item) {
     clearError();
+    hookInstalled = false;
 
     currentItem = item;
     readingSeconds = loadReadingTime(item);
@@ -909,16 +895,13 @@ p,li,blockquote,div,section,article{
 
     showReader();
     elTitle.textContent = item.title || "Livro";
-
-    const savedCfi = loadPosition(item);
-    elProgress.textContent = savedCfi ? "Retomando…" : "Carregando…";
+    elProgress.textContent = "Carregando…";
     if (elSaveBadge) elSaveBadge.classList.remove("show");
 
     startReadingTimer();
 
     if (typeof window.ePub !== "function") {
       showError("Não consegui carregar o epub.js (epub.min.js).");
-      elProgress.textContent = "—";
       return;
     }
 
@@ -928,17 +911,13 @@ p,li,blockquote,div,section,article{
         rendition = null;
       }
       book = null;
-      hookInstalled = false;
 
       const path = "epubs/" + item.file;
-
       const resp = await fetch(path);
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       const arrayBuffer = await resp.arrayBuffer();
 
       book = window.ePub(arrayBuffer);
-
-      // IMPORTANT: wait book.ready avant de choisir un spine item (cover-lock fix)
       if (book.ready) await book.ready;
 
       rendition = book.renderTo("viewer", { width: "100%", height: "100%", spread: "none" });
@@ -948,6 +927,13 @@ p,li,blockquote,div,section,article{
         updateProgressUI(location);
       });
 
+      // Applique “capabilities” du livre
+      if (item.pagination === false) {
+        flowMode = "scrolled-doc";
+        spreadMode = "none";
+        showNotice("ℹ️ Paginação desativada para este EPUB (instável). Modo rolagem ativado.");
+      }
+
       // Handlers
       btnPrev.onclick = () => rendition && rendition.prev();
       btnNext.onclick = () => rendition && rendition.next();
@@ -956,24 +942,25 @@ p,li,blockquote,div,section,article{
         if (!currentItem || !rendition) return;
         clearPosition(currentItem);
         elProgress.textContent = "Carregando…";
-        // FIX: restart => premier chapitre lisible
         const ok = await displayFirstReadable();
-        if (!ok) {
-          try { await rendition.display(); } catch(e) {}
-        }
+        if (!ok) { try { await rendition.display(); } catch(e) {} }
         applyThemeToRendition();
+        if (item.nudge) await nudgeRendition();
       };
 
       btnFontMinus.onclick = () => { fontPct = Math.max(80, fontPct - 10); applyReadingPrefs(); try{rendition.resize();}catch(e){} };
       btnFontPlus.onclick  = () => { fontPct = Math.min(200, fontPct + 10); applyReadingPrefs(); try{rendition.resize();}catch(e){} };
 
       btnFlow.onclick = () => {
+        // si le livre ne supporte pas la pagination => pas de toggle
+        if (item.pagination === false) return;
         flowMode = (flowMode === "paginated") ? "scrolled-doc" : "paginated";
         if (flowMode !== "paginated") spreadMode = "none";
         applyLayoutPrefs();
       };
 
       btnSpread.onclick = () => {
+        if (flowMode !== "paginated") return;
         spreadMode = (spreadMode === "auto") ? "none" : "auto";
         applyLayoutPrefs();
       };
@@ -983,11 +970,11 @@ p,li,blockquote,div,section,article{
       btnJustify.onclick= () => { justifyOn = !justifyOn; applyLayoutPrefs(); };
       btnHyphen.onclick = () => { hyphenOn = !hyphenOn; applyLayoutPrefs(); };
 
-      // Affichage initial
+      // Display initial (retour lecture + cover-lock fix)
+      const savedCfi = loadPosition(item);
       if (savedCfi) {
         await rendition.display(savedCfi);
       } else {
-        // FIX cover-lock: on affiche explicitement le premier contenu lisible
         const ok = await displayFirstReadable();
         if (!ok) await rendition.display();
       }
@@ -995,13 +982,17 @@ p,li,blockquote,div,section,article{
       applyThemeToRendition();
       syncLayoutButtons();
 
-      // FIX cover-lock: si malgré tout on est sur cover, on saute
-      await ensureNotStuckOnCover();
-
-      // Message soft si MLS est “capricieux”
-      if (item.id === "geografia-libertaria") {
-        showNotice("ℹ️ Se o livro ficar na capa, clique em “Recomeçar”: ele força o primeiro capítulo.");
+      // UI: désactive vraiment les boutons de pagination si non supporté
+      if (item.pagination === false) {
+        btnFlow.disabled = true;
+        btnSpread.disabled = true;
+      } else {
+        btnFlow.disabled = false;
+        btnSpread.disabled = (flowMode !== "paginated");
       }
+
+      // Nudge automatique pour MLS
+      if (item.nudge) await nudgeRendition();
 
     } catch (err) {
       console.error(err);
@@ -1010,6 +1001,7 @@ p,li,blockquote,div,section,article{
     }
   }
 
+  // Back
   btnBack.addEventListener("click", async () => {
     clearError();
     stopReadingTimer();
@@ -1017,12 +1009,29 @@ p,li,blockquote,div,section,article{
     showCatalog();
   });
 
+  // Fullscreen buttons
   if (btnFs) btnFs.addEventListener("click", toggleFullscreen);
   if (btnFsExit) btnFsExit.addEventListener("click", exitFullscreen);
+
+  // Theme
+  function initTheme() {
+    const saved = localStorage.getItem("theme");
+    setTheme(saved === "night");
+    btnNight.addEventListener("click", () => setTheme(!document.body.classList.contains("night")));
+  }
+
+  function setTheme(isNight) {
+    document.body.classList.toggle("night", isNight);
+    localStorage.setItem("theme", isNight ? "night" : "day");
+    btnNight.textContent = isNight ? "☀️ Dia" : "🌙 Noite";
+    btnNight.setAttribute("aria-label", isNight ? "Ativar modo dia" : "Ativar modo noite");
+    applyThemeToRendition();
+  }
 
   initTheme();
   syncLayoutButtons();
   renderCatalog();
+
 })();
 </script>
 
