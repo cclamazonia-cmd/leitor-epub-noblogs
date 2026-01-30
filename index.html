@@ -77,6 +77,7 @@ header strong{font-size:16px;letter-spacing:.2px}
   font-size:14px;
   transition:transform .08s ease, background .15s ease, border-color .15s ease;
   user-select:none;
+  white-space:nowrap;
 }
 .btn:hover{background:color-mix(in srgb, var(--card) 55%, var(--bg))}
 .btn:active{transform:scale(.98)}
@@ -225,6 +226,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   gap:10px;
   justify-content:center;
   flex:1;
+  flex-wrap:wrap;
 }
 
 .viewer-hint{
@@ -262,6 +264,12 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   width:100%;
   height: calc(100vh - 230px);
   background:var(--bg);
+}
+
+/* Masquer les flèches en mode scroll (elles apparaissent en mode pages) */
+body.flow-scroll #prevBtn,
+body.flow-scroll #nextBtn{
+  display:none;
 }
 
 /* Fullscreen */
@@ -356,6 +364,7 @@ body.reader-open .footer{display:none}
 
         <div class="viewer-center">
           <button class="btn" id="fontMinus" type="button" aria-label="Diminuir fonte">A−</button>
+          <button class="btn" id="modeBtn" type="button" aria-label="Alternar modo de leitura">📜</button>
           <div class="viewer-hint" id="progress">—</div>
           <button class="btn" id="fontPlus" type="button" aria-label="Aumentar fonte">A+</button>
         </div>
@@ -389,10 +398,10 @@ body.reader-open .footer{display:none}
   "use strict";
 
   // ====== CONFIG ======
-  // Ajoute cover: "assets/covers/xxx.jpg" par livre
   const BOOKS = [
-    { id: "extrativismo", title: "Extrativismo", author: "Anna Bednik e Jérémy Dotti", file: "extrativismo.epub", cover: "assets/covers/capa-extrativismo.jpg" },
-    { id: "geografia-libertaria", title: "Por uma Geografia libertária", author: "Marcelo Lopes de Souza", file: "mls.epub", cover: "assets/covers/capa-mls.jpg" }
+    // IMPORTANT: adapte ici tes chemins EXACTS. Si tes fichiers ont des espaces, garde-les.
+    { id: "extrativismo", title: "Extrativismo", author: "Anna Bednik e Jérémy Dotti", file: "extrativismo.epub", cover: "assets/covers/capa extrativismo.jpg" },
+    { id: "geografia-libertaria", title: "Por uma Geografia libertária", author: "Marcelo Lopes de Souza", file: "mls.epub", cover: "assets/covers/capa mls.jpg" }
   ];
 
   // ====== DOM ======
@@ -412,6 +421,7 @@ body.reader-open .footer{display:none}
   const btnRestart = document.getElementById("restartBtn");
   const btnFontMinus = document.getElementById("fontMinus");
   const btnFontPlus  = document.getElementById("fontPlus");
+  const btnMode      = document.getElementById("modeBtn");
   const btnJustify   = document.getElementById("justifyBtn");
   const btnHyphen    = document.getElementById("hyphenBtn");
 
@@ -425,20 +435,21 @@ body.reader-open .footer{display:none}
   let rendition = null;
   let currentItem = null;
 
-  // Font size persisted
   let fontPct = Number(localStorage.getItem("fontPct") || 110);
-
-  // Badge timer
   let saveBadgeTimer = null;
-
-  // Progress %: locations readiness
   let locReadyPromise = Promise.resolve(false);
 
-  // Justification / hyphenation
   let justifyOn = (localStorage.getItem("justifyOn") || "0") === "1";
   let hyphenOn  = (localStorage.getItem("hyphenOn")  || "1") === "1";
 
-  // ====== TIMER (rAF robuste, tranches 30s) ======
+  // Flow mode: par défaut scroll vertical continu
+  let flowMode = localStorage.getItem("flowMode") || "scrolled-doc";
+  if (flowMode !== "scrolled-doc" && flowMode !== "paginated") flowMode = "scrolled-doc";
+
+  // Hook lang (par rendition)
+  let langHookInstalled = false;
+
+  // ====== TIMER ======
   let readingSeconds = 0;
   let rafId = null;
   let lastTs = null;
@@ -453,6 +464,11 @@ body.reader-open .footer{display:none}
   }
 
   function showError(message) {
+    elError.style.display = "block";
+    elError.innerHTML = escapeHtml(message).replace(/\n/g, "<br>");
+  }
+
+  function showNotice(message){
     elError.style.display = "block";
     elError.innerHTML = escapeHtml(message).replace(/\n/g, "<br>");
   }
@@ -482,15 +498,9 @@ body.reader-open .footer{display:none}
   }
 
   // ====== STORAGE KEYS ======
-  function storageKeyForBook(item) {
-    return "pos:" + (item && item.id ? item.id : "unknown");
-  }
-  function timeKeyForBook(item) {
-    return "time:" + (item && item.id ? item.id : "unknown");
-  }
-  function locKeyForBook(item){
-    return "loc:" + (item && item.id ? item.id : "unknown");
-  }
+  function storageKeyForBook(item) { return "pos:" + (item && item.id ? item.id : "unknown"); }
+  function timeKeyForBook(item)    { return "time:" + (item && item.id ? item.id : "unknown"); }
+  function locKeyForBook(item)     { return "loc:" + (item && item.id ? item.id : "unknown"); }
 
   // ====== POSITION SAVE/LOAD (CFI) ======
   function savePosition(item, location) {
@@ -501,12 +511,10 @@ body.reader-open .footer{display:none}
       showSavedBadge();
     } catch(e) {}
   }
-
   function loadPosition(item) {
     try { return localStorage.getItem(storageKeyForBook(item)); }
     catch(e){ return null; }
   }
-
   function clearPosition(item) {
     try { localStorage.removeItem(storageKeyForBook(item)); }
     catch(e){}
@@ -515,10 +523,8 @@ body.reader-open .footer{display:none}
   // ====== LOCATIONS (for % progress) ======
   async function ensureLocations(item){
     if (!book || !book.locations) return false;
-
     try {
       if (book.ready) await book.ready;
-
       if (typeof book.locations.length === "function" && book.locations.length() > 0) return true;
 
       const saved = localStorage.getItem(locKeyForBook(item));
@@ -529,10 +535,7 @@ body.reader-open .footer{display:none}
 
       await book.locations.generate(1024);
 
-      try {
-        localStorage.setItem(locKeyForBook(item), book.locations.save());
-      } catch(e) {}
-
+      try { localStorage.setItem(locKeyForBook(item), book.locations.save()); } catch(e) {}
       return (typeof book.locations.length === "function" && book.locations.length() > 0);
     } catch(e) {
       return false;
@@ -545,9 +548,7 @@ body.reader-open .footer{display:none}
     const p = location && location.start && location.start.percentage;
     if (typeof p === "number" && isFinite(p)) {
       const pp = Math.max(0, Math.min(1, p));
-      if (displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99) {
-        // ignore degenerate
-      } else {
+      if (!(displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99)) {
         return pp;
       }
     }
@@ -560,13 +561,10 @@ body.reader-open .footer{display:none}
       const px = book.locations.percentageFromCfi(cfi);
       if (typeof px === "number" && isFinite(px)) {
         const pp = Math.max(0, Math.min(1, px));
-        if (displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99) {
-          return null;
-        }
+        if (displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99) return null;
         return pp;
       }
     }
-
     return null;
   }
 
@@ -581,15 +579,11 @@ body.reader-open .footer{display:none}
     try {
       const v = Number(localStorage.getItem(timeKeyForBook(item)) || 0);
       return Number.isFinite(v) && v >= 0 ? v : 0;
-    } catch(e){
-      return 0;
-    }
+    } catch(e){ return 0; }
   }
 
   function saveReadingTime(item){
-    try {
-      localStorage.setItem(timeKeyForBook(item), String(readingSeconds));
-    } catch(e){}
+    try { localStorage.setItem(timeKeyForBook(item), String(readingSeconds)); } catch(e){}
   }
 
   function formatTime(sec){
@@ -616,7 +610,6 @@ body.reader-open .footer{display:none}
 
   function rafLoop(ts){
     if (lastTs === null) lastTs = ts;
-
     let dt = ts - lastTs;
     lastTs = ts;
 
@@ -627,7 +620,6 @@ body.reader-open .footer{display:none}
       carryMs += dt;
       commitChunks();
     }
-
     rafId = requestAnimationFrame(rafLoop);
   }
 
@@ -670,9 +662,78 @@ body.reader-open .footer{display:none}
     if (btnHyphen)  btnHyphen.textContent  = hyphenOn  ? "Hy✓" : "Hy";
   }
 
+  // ====== FLOW MODE (scroll vs pages) ======
+  function labelMode(){
+    return (flowMode === "paginated") ? "📄" : "📜";
+  }
+
+  function syncModeUI(){
+    document.body.classList.toggle("flow-scroll", flowMode !== "paginated");
+    document.body.classList.toggle("flow-pages", flowMode === "paginated");
+
+    if (btnMode) {
+      btnMode.textContent = labelMode();
+      btnMode.setAttribute(
+        "aria-label",
+        flowMode === "paginated"
+          ? "Mudar para rolagem (scroll)"
+          : "Mudar para página por página"
+      );
+    }
+  }
+
+  async function applyFlowMode(keepLocation = true){
+    if (!rendition) return;
+
+    let cfi = null;
+    if (keepLocation) {
+      try {
+        const loc = rendition.currentLocation && rendition.currentLocation();
+        cfi = loc && loc.start && loc.start.cfi ? loc.start.cfi : null;
+      } catch(e){}
+    }
+
+    // Spread none pour éviter double page (plus stable)
+    try { rendition.spread("none"); } catch(e){}
+
+    try {
+      rendition.flow(flowMode); // "scrolled-doc" ou "paginated"
+    } catch(e){
+      flowMode = "scrolled-doc";
+      try { rendition.flow(flowMode); } catch(_e){}
+    }
+
+    syncModeUI();
+
+    // Re-display au même endroit
+    try {
+      if (cfi) await rendition.display(cfi);
+    } catch(e){}
+
+    try { rendition.resize(); } catch(e){}
+  }
+
   // ====== THEME + TEXT LAYOUT (justify/hyphen) ======
+  function ensureLangHook(){
+    if (!rendition || langHookInstalled) return;
+    langHookInstalled = true;
+
+    try {
+      rendition.hooks.content.register((contents) => {
+        try {
+          const doc = contents.document;
+          if (!doc) return;
+          if (!doc.documentElement.getAttribute("lang")) doc.documentElement.setAttribute("lang","pt-BR");
+          if (doc.body && !doc.body.getAttribute("lang")) doc.body.setAttribute("lang","pt-BR");
+        } catch(e) {}
+      });
+    } catch(e) {}
+  }
+
   function applyThemeToRendition() {
     if (!rendition) return;
+
+    ensureLangHook();
 
     const night = document.body.classList.contains("night");
     const align = justifyOn ? "justify" : "start";
@@ -698,18 +759,6 @@ body.reader-open .footer{display:none}
     rendition.themes.select("app");
 
     try {
-      // Force lang for hyphenation on compatible browsers
-      rendition.hooks.content.register((contents) => {
-        try {
-          const doc = contents.document;
-          if (!doc) return;
-          if (!doc.documentElement.getAttribute("lang")) doc.documentElement.setAttribute("lang","pt-BR");
-          if (doc.body && !doc.body.getAttribute("lang")) doc.body.setAttribute("lang","pt-BR");
-        } catch(e) {}
-      });
-    } catch(e) {}
-
-    try {
       rendition.themes.override("body", "padding", "18px 18px 24px 18px");
       rendition.themes.override("body", "margin", "0");
       rendition.themes.override("html", "margin", "0");
@@ -717,6 +766,7 @@ body.reader-open .footer{display:none}
 
     applyReadingPrefs();
     syncJustifyHyphenButtons();
+
     try { localStorage.setItem("justifyOn", justifyOn ? "1" : "0"); } catch(e) {}
     try { localStorage.setItem("hyphenOn",  hyphenOn  ? "1" : "0"); } catch(e) {}
   }
@@ -841,6 +891,48 @@ body.reader-open .footer{display:none}
     elProgress.textContent = pagePart + pctPart;
   }
 
+  // ====== REPRISE "future-proof" ======
+  function looksLikeCoverHref(href){
+    const h = String(href || "").toLowerCase();
+    return h.includes("cover") || h.includes("titlepage") || h.includes("capa");
+  }
+
+  async function displayFromTOCOrSpine(){
+    // 1) TOC (nav)
+    try {
+      if (book && book.navigation && Array.isArray(book.navigation.toc) && book.navigation.toc.length) {
+        const toc = book.navigation.toc;
+        const firstGood = toc.find(t => t && t.href && !looksLikeCoverHref(t.href)) || toc.find(t => t && t.href) || null;
+        if (firstGood && firstGood.href) {
+          await rendition.display(firstGood.href);
+          return true;
+        }
+      }
+    } catch(e) {}
+
+    // 2) spine: premier item linear "yes" non-cover
+    try {
+      const items = book && book.spine && book.spine.items ? book.spine.items : null;
+      if (items && items.length) {
+        for (const it of items) {
+          const linear = String(it.linear || "yes").toLowerCase();
+          if (linear === "no") continue;
+          const href = it.href || "";
+          if (!href) continue;
+          if (looksLikeCoverHref(href)) continue;
+          try {
+            await rendition.display(href);
+            return true;
+          } catch(e){}
+        }
+      }
+    } catch(e) {}
+
+    // 3) fallback epub.js
+    try { await rendition.display(); return true; } catch(e) {}
+    return false;
+  }
+
   // ====== EPUB ======
   async function openBook(item) {
     clearError();
@@ -875,6 +967,9 @@ body.reader-open .footer{display:none}
       }
       book = null;
 
+      // reset hook per nouvelle rendition
+      langHookInstalled = false;
+
       const path = "epubs/" + item.file;
 
       const resp = await fetch(path);
@@ -883,7 +978,6 @@ body.reader-open .footer{display:none}
 
       book = window.ePub(arrayBuffer);
 
-      // prepare locations for % progress (wait for book.ready, cache)
       locReadyPromise = (book.ready ? book.ready.then(() => ensureLocations(item)) : ensureLocations(item));
 
       rendition = book.renderTo("viewer", {
@@ -892,6 +986,10 @@ body.reader-open .footer{display:none}
         spread: "none"
       });
 
+      // Applique mode par défaut immédiatement (scroll), avant la 1ère display
+      syncModeUI();
+      await applyFlowMode(false);
+
       btnPrev.onclick = () => rendition && rendition.prev();
       btnNext.onclick = () => rendition && rendition.next();
 
@@ -899,7 +997,8 @@ body.reader-open .footer{display:none}
         if (!currentItem || !rendition) return;
         clearPosition(currentItem);
         elProgress.textContent = "Carregando…";
-        try { await rendition.display(); } catch(e) {}
+        try { await displayFromTOCOrSpine(); } catch(e){}
+        await applyFlowMode(true);
       };
 
       btnFontMinus.onclick = () => {
@@ -910,6 +1009,14 @@ body.reader-open .footer{display:none}
         fontPct = Math.min(200, fontPct + 10);
         applyReadingPrefs();
       };
+
+      if (btnMode) {
+        btnMode.onclick = async () => {
+          flowMode = (flowMode === "paginated") ? "scrolled-doc" : "paginated";
+          try { localStorage.setItem("flowMode", flowMode); } catch(e){}
+          await applyFlowMode(true);
+        };
+      }
 
       btnJustify.onclick = () => {
         justifyOn = !justifyOn;
@@ -931,14 +1038,26 @@ body.reader-open .footer{display:none}
 
       rendition.on("rendered", () => applyThemeToRendition());
 
+      // ===== Reprise robuste =====
       if (savedCfi) {
-        await rendition.display(savedCfi);
+        try {
+          await rendition.display(savedCfi);
+        } catch(e) {
+          clearPosition(item);
+          showNotice("ℹ️ Posição salva incompatível com a nova versão do EPUB. Abrindo no início do conteúdo…");
+          await displayFromTOCOrSpine();
+        }
       } else {
-        await rendition.display();
+        const ok = await displayFromTOCOrSpine();
+        if (!ok) {
+          try { await rendition.display(); } catch(e){}
+        }
       }
 
+      // applique thème + recale le mode sur la position actuelle
       applyThemeToRendition();
       syncJustifyHyphenButtons();
+      await applyFlowMode(true);
 
       // Ensure locations ready then force a first % update
       try {
@@ -966,10 +1085,10 @@ body.reader-open .footer{display:none}
 
   initTheme();
   syncJustifyHyphenButtons();
+  syncModeUI();
   renderCatalog();
 })();
 </script>
 
 </body>
 </html>
-
