@@ -77,13 +77,16 @@ header strong{font-size:16px;letter-spacing:.2px}
   font-size:14px;
   transition:transform .08s ease, background .15s ease, border-color .15s ease;
   user-select:none;
-  white-space:nowrap;
 }
 .btn:hover{background:color-mix(in srgb, var(--card) 55%, var(--bg))}
 .btn:active{transform:scale(.98)}
 .btn:focus{outline:2px solid color-mix(in srgb, var(--accent) 35%, transparent);outline-offset:2px}
-.btn-primary{border-color:transparent;background:var(--accent);color:var(--accentfg)}
-.btn[disabled]{opacity:.55;cursor:not-allowed}
+
+.btn-primary{
+  border-color:transparent;
+  background:var(--accent);
+  color:var(--accentfg);
+}
 
 main{
   max-width:980px;
@@ -104,7 +107,7 @@ body.reader-open main{max-width:min(1200px, 96vw)}
 h2{margin:0 0 8px 0;font-size:18px}
 p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
 
-/* ===== Catalogue ===== */
+/* ===== Catalogue (avec covers) ===== */
 .book{
   display:flex;
   justify-content:space-between;
@@ -116,14 +119,12 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   background:var(--bg);
   margin-bottom:12px;
 }
-
 .book-left{
   display:flex;
   align-items:center;
   gap:12px;
   min-width:0;
 }
-
 .book-cover{
   height:60px;
   width:auto;
@@ -134,7 +135,6 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   box-shadow:0 6px 16px rgba(0,0,0,.10);
   background:color-mix(in srgb, var(--card) 70%, var(--bg));
 }
-
 .book-cover-fallback{
   height:60px;
   width:42px;
@@ -151,7 +151,6 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   line-height:1.1;
   background:color-mix(in srgb, var(--card) 70%, var(--bg));
 }
-
 .book-meta{min-width:0;}
 .book strong{
   display:block;
@@ -170,17 +169,9 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   white-space:nowrap;
 }
 
-.book-actions{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  flex:0 0 auto;
-}
-
-@media (max-width: 560px){
+@media (max-width:560px){
   .book{align-items:flex-start;}
-  .book-actions{flex-direction:column;align-items:stretch;}
-  .book strong, .book small{white-space:normal;}
+  .book strong,.book small{white-space:normal;}
 }
 
 /* ===== Reader ===== */
@@ -219,25 +210,22 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   background:var(--card);
 }
 
-.viewer-left,.viewer-center,.viewer-right{
+.viewer-left,.viewer-right{
   display:flex;
   align-items:center;
   gap:8px;
+  min-width: 180px;
 }
-
 .viewer-left{justify-content:flex-start; flex-wrap:wrap}
-.viewer-center{justify-content:center; flex:1; min-width:240px;}
-.viewer-right{justify-content:flex-end; gap:8px; flex-wrap:wrap;}
+.viewer-right{justify-content:flex-end; flex-wrap:wrap}
 
-.layout-controls{
+.viewer-center{
   display:flex;
   align-items:center;
-  gap:8px;
-  flex-wrap:wrap;
-  justify-content:flex-end;
+  gap:10px;
+  justify-content:center;
+  flex:1;
 }
-
-.pill,.save-badge{white-space:nowrap}
 
 .viewer-hint{
   color:var(--muted);
@@ -253,6 +241,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   border:1px solid var(--border);
   border-radius:999px;
   background:color-mix(in srgb, var(--bg) 70%, var(--card));
+  white-space:nowrap;
 }
 
 .save-badge{
@@ -265,49 +254,17 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   opacity:0;
   transform:translateY(2px);
   transition:opacity .18s ease, transform .18s ease;
+  white-space:nowrap;
 }
 .save-badge.show{opacity:1;transform:translateY(0)}
 
-/* IMPORTANT: rendre le viewer scrollable */
 #viewer{
   width:100%;
-  height: calc(100vh - 280px);
+  height: calc(100vh - 230px);
   background:var(--bg);
-  overflow-y:auto;   /* <-- CRUCIAL */
-  overflow-x:hidden; /* <-- évite le scroll horizontal */
 }
 
-/* Toolbar responsive */
-@media (max-width: 1100px){
-  .viewer-toolbar{
-    display:grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-areas:
-      "left right"
-      "center center";
-    gap:10px;
-  }
-  .viewer-left{grid-area:left}
-  .viewer-right{grid-area:right}
-  .viewer-center{grid-area:center; justify-content:center; min-width:0}
-  .viewer-hint{min-width:0}
-}
-
-@media (max-width: 620px){
-  .viewer-toolbar{
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "left"
-      "center"
-      "right";
-  }
-  .viewer-left,.viewer-center,.viewer-right{justify-content:space-between;}
-  .layout-controls{justify-content:flex-start;}
-  .viewer-right{gap:10px;}
-  .btn{padding:9px 10px; font-size:13px; border-radius:11px}
-  .pill,.save-badge{font-size:11px; padding:5px 8px}
-}
-
+/* Fullscreen */
 .fullscreen-exit{
   position:absolute;
   top:10px;
@@ -392,6 +349,7 @@ body.reader-open .footer{display:none}
     <div class="viewer" id="viewerShell">
       <div class="viewer-toolbar">
         <div class="viewer-left">
+          <button class="btn" id="prevBtn" type="button" aria-label="Página anterior">←</button>
           <button class="btn" id="restartBtn" type="button" aria-label="Recomeçar do início">Recomeçar</button>
           <button class="btn" id="fsBtn" type="button" aria-label="Tela cheia">⛶</button>
         </div>
@@ -403,15 +361,12 @@ body.reader-open .footer{display:none}
         </div>
 
         <div class="viewer-right">
-          <div class="layout-controls">
-            <button class="btn" id="marginBtn" type="button" aria-label="Ajustar margens">Margens</button>
-            <button class="btn" id="widthBtn" type="button" aria-label="Ajustar largura do texto">Largura</button>
-            <button class="btn" id="justifyBtn" type="button" aria-label="Justificação">J</button>
-            <button class="btn" id="hyphenBtn" type="button" aria-label="Hifenização">Hy</button>
-          </div>
+          <button class="btn" id="justifyBtn" type="button" aria-label="Justificação">J</button>
+          <button class="btn" id="hyphenBtn" type="button" aria-label="Hifenização">Hy</button>
 
           <span class="pill" id="timePill" aria-label="Tempo de leitura">Tempo: 00:00</span>
           <span class="save-badge" id="saveBadge" aria-live="polite">Última leitura salva ✅</span>
+          <button class="btn" id="nextBtn" type="button" aria-label="Próxima página">→</button>
         </div>
       </div>
 
@@ -433,13 +388,11 @@ body.reader-open .footer{display:none}
 (() => {
   "use strict";
 
-  // ====== Option B: notices désactivées par défaut ======
-  const DEBUG_NOTICES = false;
-
   // ====== CONFIG ======
+  // Ajoute cover: "assets/covers/xxx.jpg" par livre
   const BOOKS = [
-    { id: "extrativismo", title: "Extrativismo", author: "Anna Bednik e Jérémy Dotti", file: "extrativismo.epub", cover: "assets/covers/capa-extrativismo.jpg", nudge: false },
-    { id: "geografia-libertaria", title: "Por uma Geografia libertária", author: "Marcelo Lopes de Souza", file: "mls.epub", cover: "assets/covers/capa-mls.jpg", nudge: true }
+    { id: "extrativismo", title: "Extrativismo", author: "Anna Bednik e Jérémy Dotti", file: "extrativismo.epub", cover: "assets/covers/capa extrativismo.jpg" },
+    { id: "geografia-libertaria", title: "Por uma Geografia libertária", author: "Marcelo Lopes de Souza", file: "mls.epub", cover: "assets/covers/capa mls.jpg" }
   ];
 
   // ====== DOM ======
@@ -454,59 +407,49 @@ body.reader-open .footer{display:none}
 
   const btnNight = document.getElementById("toggleNight");
   const btnBack = document.getElementById("backBtn");
+  const btnPrev = document.getElementById("prevBtn");
+  const btnNext = document.getElementById("nextBtn");
   const btnRestart = document.getElementById("restartBtn");
   const btnFontMinus = document.getElementById("fontMinus");
   const btnFontPlus  = document.getElementById("fontPlus");
+  const btnJustify   = document.getElementById("justifyBtn");
+  const btnHyphen    = document.getElementById("hyphenBtn");
 
   // Fullscreen
   const viewerShell = document.getElementById("viewerShell");
   const btnFs = document.getElementById("fsBtn");
   const btnFsExit = document.getElementById("fsExitBtn");
 
-  // Layout controls
-  const btnMargin = document.getElementById("marginBtn");
-  const btnWidth  = document.getElementById("widthBtn");
-  const btnJustify= document.getElementById("justifyBtn");
-  const btnHyphen = document.getElementById("hyphenBtn");
-
   // ====== STATE ======
   let book = null;
   let rendition = null;
   let currentItem = null;
 
+  // Font size persisted
   let fontPct = Number(localStorage.getItem("fontPct") || 110);
+
+  // Badge timer
   let saveBadgeTimer = null;
 
-  let marginPx   = Number(localStorage.getItem("marginPx") || 18);
-  let maxWidthCh = Number(localStorage.getItem("maxWidthCh") || 72);
-  let justifyOn  = (localStorage.getItem("justifyOn") || "0") === "1";
-  let hyphenOn   = (localStorage.getItem("hyphenOn") || "1") === "1";
-  let columnGap  = Number(localStorage.getItem("columnGap") || 28);
+  // Progress %: locations readiness
+  let locReadyPromise = Promise.resolve(false);
 
-  const MARGIN_STEPS = [12,18,24,30];
-  const WIDTH_STEPS  = [0,60,72,84];
+  // Justification / hyphenation
+  let justifyOn = (localStorage.getItem("justifyOn") || "0") === "1";
+  let hyphenOn  = (localStorage.getItem("hyphenOn")  || "1") === "1";
 
-  // Timer lecture
+  // ====== TIMER (rAF robuste, tranches 30s) ======
   let readingSeconds = 0;
   let rafId = null;
   let lastTs = null;
   let carryMs = 0;
   const CHUNK_MS = 30000;
 
-  // CSS injecté
-  let injectedCss = "";
-  let hookInstalled = false;
-
+  // ====== UTIL ======
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>"']/g, (m) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
     }[m]));
-  }
-
-  function showNotice(message) {
-    if (!DEBUG_NOTICES) return;
-    elError.style.display = "block";
-    elError.innerHTML = escapeHtml(message).replace(/\n/g, "<br>");
   }
 
   function showError(message) {
@@ -538,9 +481,18 @@ body.reader-open .footer{display:none}
     saveBadgeTimer = setTimeout(() => elSaveBadge.classList.remove("show"), 1400);
   }
 
-  function storageKeyForBook(item) { return "pos:" + (item && item.id ? item.id : "unknown"); }
-  function timeKeyForBook(item)    { return "time:" + (item && item.id ? item.id : "unknown"); }
+  // ====== STORAGE KEYS ======
+  function storageKeyForBook(item) {
+    return "pos:" + (item && item.id ? item.id : "unknown");
+  }
+  function timeKeyForBook(item) {
+    return "time:" + (item && item.id ? item.id : "unknown");
+  }
+  function locKeyForBook(item){
+    return "loc:" + (item && item.id ? item.id : "unknown");
+  }
 
+  // ====== POSITION SAVE/LOAD (CFI) ======
   function savePosition(item, location) {
     try {
       const cfi = location && location.start && location.start.cfi;
@@ -560,15 +512,84 @@ body.reader-open .footer{display:none}
     catch(e){}
   }
 
+  // ====== LOCATIONS (for % progress) ======
+  async function ensureLocations(item){
+    if (!book || !book.locations) return false;
+
+    try {
+      if (book.ready) await book.ready;
+
+      if (typeof book.locations.length === "function" && book.locations.length() > 0) return true;
+
+      const saved = localStorage.getItem(locKeyForBook(item));
+      if (saved) {
+        book.locations.load(saved);
+        if (book.locations.length() > 0) return true;
+      }
+
+      await book.locations.generate(1024);
+
+      try {
+        localStorage.setItem(locKeyForBook(item), book.locations.save());
+      } catch(e) {}
+
+      return (typeof book.locations.length === "function" && book.locations.length() > 0);
+    } catch(e) {
+      return false;
+    }
+  }
+
+  function percentFromLocation(location){
+    const displayed = location && location.start && location.start.displayed;
+
+    const p = location && location.start && location.start.percentage;
+    if (typeof p === "number" && isFinite(p)) {
+      const pp = Math.max(0, Math.min(1, p));
+      if (displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99) {
+        // ignore degenerate
+      } else {
+        return pp;
+      }
+    }
+
+    const cfi = location && location.start && location.start.cfi;
+    if (!cfi || !book || !book.locations || typeof book.locations.length !== "function") return null;
+    if (book.locations.length() === 0) return null;
+
+    if (typeof book.locations.percentageFromCfi === "function") {
+      const px = book.locations.percentageFromCfi(cfi);
+      if (typeof px === "number" && isFinite(px)) {
+        const pp = Math.max(0, Math.min(1, px));
+        if (displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99) {
+          return null;
+        }
+        return pp;
+      }
+    }
+
+    return null;
+  }
+
+  // ====== TIMER (rAF) ======
+  function isReadingActive(){
+    return document.body.classList.contains("reader-open")
+      && document.visibilityState === "visible"
+      && !!currentItem;
+  }
+
   function loadReadingTime(item){
     try {
       const v = Number(localStorage.getItem(timeKeyForBook(item)) || 0);
       return Number.isFinite(v) && v >= 0 ? v : 0;
-    } catch(e){ return 0; }
+    } catch(e){
+      return 0;
+    }
   }
 
   function saveReadingTime(item){
-    try { localStorage.setItem(timeKeyForBook(item), String(readingSeconds)); } catch(e){}
+    try {
+      localStorage.setItem(timeKeyForBook(item), String(readingSeconds));
+    } catch(e){}
   }
 
   function formatTime(sec){
@@ -593,14 +614,9 @@ body.reader-open .footer{display:none}
     }
   }
 
-  function isReadingActive(){
-    return document.body.classList.contains("reader-open")
-      && document.visibilityState === "visible"
-      && !!currentItem;
-  }
-
   function rafLoop(ts){
     if (lastTs === null) lastTs = ts;
+
     let dt = ts - lastTs;
     lastTs = ts;
 
@@ -611,6 +627,7 @@ body.reader-open .footer{display:none}
       carryMs += dt;
       commitChunks();
     }
+
     rafId = requestAnimationFrame(rafLoop);
   }
 
@@ -630,10 +647,16 @@ body.reader-open .footer{display:none}
     lastTs = null;
   }
 
+  document.addEventListener("visibilitychange", () => {
+    lastTs = null;
+    updateTimeUI();
+  });
+
   window.addEventListener("pagehide", () => {
     if (currentItem) saveReadingTime(currentItem);
   });
 
+  // ====== READING PREFS ======
   function applyReadingPrefs() {
     if (!rendition) return;
     try {
@@ -642,149 +665,62 @@ body.reader-open .footer{display:none}
     } catch(e) {}
   }
 
-  function persistLayoutPrefs(){
-    try {
-      localStorage.setItem("marginPx", String(marginPx));
-      localStorage.setItem("maxWidthCh", String(maxWidthCh));
-      localStorage.setItem("justifyOn", justifyOn ? "1" : "0");
-      localStorage.setItem("hyphenOn",  hyphenOn ? "1" : "0");
-      localStorage.setItem("columnGap", String(columnGap));
-    } catch(e){}
+  function syncJustifyHyphenButtons(){
+    if (btnJustify) btnJustify.textContent = justifyOn ? "J✓" : "J";
+    if (btnHyphen)  btnHyphen.textContent  = hyphenOn  ? "Hy✓" : "Hy";
   }
 
-  function labelMargin(){ return `M ${marginPx}`; }
-  function labelWidth(){ return (maxWidthCh && maxWidthCh > 0) ? `${maxWidthCh}ch` : "Tela"; }
-  function labelJustify(){ return justifyOn ? "J✓" : "J"; }
-  function labelHyphen(){ return hyphenOn ? "Hy✓" : "Hy"; }
+  // ====== THEME + TEXT LAYOUT (justify/hyphen) ======
+  function applyThemeToRendition() {
+    if (!rendition) return;
 
-  function syncLayoutButtons(){
-    if (btnMargin) btnMargin.textContent = labelMargin();
-    if (btnWidth)  btnWidth.textContent = `L ${labelWidth()}`;
-    if (btnJustify)btnJustify.textContent = labelJustify();
-    if (btnHyphen) btnHyphen.textContent = labelHyphen();
-  }
-
-  function cycleValue(list, current){
-    const i = list.indexOf(current);
-    return list[(i >= 0 ? i + 1 : 0) % list.length];
-  }
-
-  function buildInjectedCss(){
     const night = document.body.classList.contains("night");
     const align = justifyOn ? "justify" : "start";
     const hy = hyphenOn ? "auto" : "manual";
-    const pad = `${marginPx}px ${marginPx}px ${marginPx + 6}px ${marginPx}px`;
-    const maxw = (maxWidthCh && maxWidthCh > 0) ? `${maxWidthCh}ch` : "none";
-    const mx = (maxWidthCh && maxWidthCh > 0) ? "auto" : "0";
-    const gap = `${columnGap}px`;
 
-    return `
-html{ -webkit-text-size-adjust:100%; }
-html,body{ margin:0 !important; }
-body{
-  background:${night ? "#0f1115" : "#ffffff"} !important;
-  color:${night ? "#e9edf1" : "#111111"} !important;
-  line-height:1.65 !important;
-  padding:${pad} !important;
-  max-width:${maxw} !important;
-  margin-left:${mx} !important;
-  margin-right:${mx} !important;
-  column-gap:${gap} !important;
-
-  hyphens:${hy} !important;
-  -webkit-hyphens:${hy} !important;
-  -ms-hyphens:${hy} !important;
-
-  overflow-wrap:break-word !important;
-  word-break:normal !important;
-}
-
-a{ color:${night ? "#8ab4f8" : "#0b57d0"} !important; }
-
-p,li,blockquote,div,section,article{
-  text-align:${align} !important;
-  hyphens:${hy} !important;
-  -webkit-hyphens:${hy} !important;
-  -ms-hyphens:${hy} !important;
-}
-`;
-  }
-
-  function ensureHook(){
-    if (!rendition || hookInstalled) return;
-    hookInstalled = true;
-
-    rendition.hooks.content.register((contents) => {
-      try{
-        const doc = contents.document;
-        if (!doc) return;
-
-        if (!doc.documentElement.getAttribute("lang")) doc.documentElement.setAttribute("lang","pt-BR");
-        if (doc.body && !doc.body.getAttribute("lang")) doc.body.setAttribute("lang","pt-BR");
-
-        let style = doc.getElementById("ccla-app-overrides");
-        if (!style) {
-          style = doc.createElement("style");
-          style.id = "ccla-app-overrides";
-          style.type = "text/css";
-          (doc.head || doc.documentElement).appendChild(style);
-        }
-        style.textContent = injectedCss || "";
-      } catch(e){}
+    rendition.themes.register("app", {
+      "body": {
+        "background": night ? "#0f1115" : "#ffffff",
+        "color": night ? "#e9edf1" : "#111111",
+        "line-height": "1.65",
+        "text-rendering": "optimizeLegibility"
+      },
+      "p,li,blockquote,div,section,article": {
+        "line-height": "1.65",
+        "text-align": align,
+        "hyphens": hy,
+        "-webkit-hyphens": hy,
+        "-ms-hyphens": hy
+      },
+      "a": { "color": night ? "#8ab4f8" : "#0b57d0" }
     });
-  }
 
-  function refreshInjectedCss(){
-    injectedCss = buildInjectedCss();
-    if (!rendition) return;
+    rendition.themes.select("app");
 
-    try{
-      const views = rendition.views && rendition.views();
-      if (views && views.forEach) {
-        views.forEach(v => {
-          try{
-            const doc = v.document;
-            if (!doc) return;
+    try {
+      // Force lang for hyphenation on compatible browsers
+      rendition.hooks.content.register((contents) => {
+        try {
+          const doc = contents.document;
+          if (!doc) return;
+          if (!doc.documentElement.getAttribute("lang")) doc.documentElement.setAttribute("lang","pt-BR");
+          if (doc.body && !doc.body.getAttribute("lang")) doc.body.setAttribute("lang","pt-BR");
+        } catch(e) {}
+      });
+    } catch(e) {}
 
-            if (!doc.documentElement.getAttribute("lang")) doc.documentElement.setAttribute("lang","pt-BR");
-            if (doc.body && !doc.body.getAttribute("lang")) doc.body.setAttribute("lang","pt-BR");
+    try {
+      rendition.themes.override("body", "padding", "18px 18px 24px 18px");
+      rendition.themes.override("body", "margin", "0");
+      rendition.themes.override("html", "margin", "0");
+    } catch(e) {}
 
-            let style = doc.getElementById("ccla-app-overrides");
-            if (!style) {
-              style = doc.createElement("style");
-              style.id = "ccla-app-overrides";
-              style.type = "text/css";
-              (doc.head || doc.documentElement).appendChild(style);
-            }
-            style.textContent = injectedCss;
-          } catch(e){}
-        });
-      }
-    } catch(e){}
-  }
-
-  function applyLayoutPrefs(){
-    if (!rendition) return;
-
-    // Mode unique et stable
-    try { rendition.flow("scrolled-doc"); } catch(e) {}
-    try { rendition.spread("none"); } catch(e) {}
-
-    persistLayoutPrefs();
-    syncLayoutButtons();
-
-    refreshInjectedCss();
-    try { rendition.resize(); } catch(e) {}
-  }
-
-  function applyThemeToRendition(){
-    if (!rendition) return;
-    ensureHook();
     applyReadingPrefs();
-    applyLayoutPrefs();
+    syncJustifyHyphenButtons();
+    try { localStorage.setItem("justifyOn", justifyOn ? "1" : "0"); } catch(e) {}
+    try { localStorage.setItem("hyphenOn",  hyphenOn  ? "1" : "0"); } catch(e) {}
   }
 
-  // ===== Theme =====
   function setTheme(isNight) {
     document.body.classList.toggle("night", isNight);
     localStorage.setItem("theme", isNight ? "night" : "day");
@@ -797,58 +733,6 @@ p,li,blockquote,div,section,article{
     const saved = localStorage.getItem("theme");
     setTheme(saved === "night");
     btnNight.addEventListener("click", () => setTheme(!document.body.classList.contains("night")));
-  }
-
-  // ===== Catalogue =====
-  function coverHtml(b){
-    if (!b.cover) {
-      return `<div class="book-cover-fallback" aria-hidden="true">sem<br>capa</div>`;
-    }
-    return `
-      <img
-        class="book-cover"
-        src="${escapeHtml(b.cover)}"
-        alt="Capa – ${escapeHtml(b.title)}"
-        loading="lazy"
-        onerror="this.outerHTML='<div class=&quot;book-cover-fallback&quot; aria-hidden=&quot;true&quot;>sem<br>capa</div>'"
-      >
-    `;
-  }
-
-  function renderCatalog() {
-    if (!elBooks) return;
-
-    elBooks.innerHTML = BOOKS.map(b => `
-      <div class="book">
-        <div class="book-left">
-          ${coverHtml(b)}
-          <div class="book-meta">
-            <strong title="${escapeHtml(b.title)}">${escapeHtml(b.title)}</strong>
-            <small title="${escapeHtml(b.author || "")}">${escapeHtml(b.author || "")}</small>
-          </div>
-        </div>
-
-        <div class="book-actions">
-          <button class="btn btn-primary" type="button" data-book="${escapeHtml(b.id)}">Ler</button>
-        </div>
-      </div>
-    `).join("");
-
-    elBooks.querySelectorAll("button[data-book]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const id = btn.getAttribute("data-book");
-        const item = BOOKS.find(x => x.id === id);
-        if (item) openBook(item);
-      });
-    });
-  }
-
-  function updateProgressUI(location){
-    const displayed = location && location.start && location.start.displayed;
-    const pagePart = (displayed && displayed.page && displayed.total)
-      ? `Página ${displayed.page} / ${displayed.total}`
-      : "—";
-    elProgress.textContent = pagePart;
   }
 
   // ===== FULLSCREEN =====
@@ -882,6 +766,7 @@ p,li,blockquote,div,section,article{
     if (btnFs) btnFs.textContent = fs ? "⤫" : "⛶";
     if (fs) showFsExitTemporarily();
     else if (btnFsExit) btnFsExit.classList.remove("show");
+    try { rendition && rendition.resize(); } catch(e){}
   });
 
   ["mousemove","touchstart","click"].forEach(evt => {
@@ -890,58 +775,75 @@ p,li,blockquote,div,section,article{
     }, {passive:true});
   });
 
-  // ===== START TARGET: anti-cover solide (TOC puis spine) =====
-  async function displayStart(item){
-    // 1) Position sauvegardée
-    const savedCfi = loadPosition(item);
-    if (savedCfi) {
-      try { await rendition.display(savedCfi); return true; } catch(e){}
+  // ====== UI ======
+  function coverHtml(b){
+    if (!b.cover) {
+      return `<div class="book-cover-fallback" aria-hidden="true">sem<br>capa</div>`;
+    }
+    return `
+      <img
+        class="book-cover"
+        src="${escapeHtml(b.cover)}"
+        alt="Capa – ${escapeHtml(b.title)}"
+        loading="lazy"
+        onerror="this.outerHTML='<div class=&quot;book-cover-fallback&quot; aria-hidden=&quot;true&quot;>sem<br>capa</div>'"
+      >
+    `;
+  }
+
+  function renderCatalog() {
+    if (!elBooks) return;
+
+    if (!Array.isArray(BOOKS) || BOOKS.length === 0) {
+      elBooks.innerHTML = `
+        <div class="notice">
+          Nenhum livro configurado.<br>
+          Adicione arquivos <code>.epub</code> em <code>epubs/</code> e atualize a lista no código.
+        </div>
+      `;
+      return;
     }
 
-    // 2) TOC: premier item non-cover
-    try{
-      const nav = await book.loaded.navigation;
-      const toc = nav && nav.toc ? nav.toc : [];
-      for (const entry of toc) {
-        if (!entry || !entry.href) continue;
-        const href = String(entry.href).toLowerCase();
-        if (href.includes("cover") || href.includes("titlepage")) continue;
-        await rendition.display(entry.href);
-        return true;
-      }
-    } catch(e){}
+    elBooks.innerHTML = BOOKS.map(b => `
+      <div class="book">
+        <div class="book-left">
+          ${coverHtml(b)}
+          <div class="book-meta">
+            <strong>${escapeHtml(b.title)}</strong>
+            <small>${escapeHtml(b.author || "")}</small>
+          </div>
+        </div>
+        <button class="btn btn-primary" type="button" data-book="${escapeHtml(b.id)}">Ler</button>
+      </div>
+    `).join("");
 
-    // 3) Spine: premier item linéaire non-cover
-    try{
-      const items = (book && book.spine && book.spine.items) ? book.spine.items : [];
-      for (const it of items) {
-        if (!it || !it.href) continue;
-        const href = String(it.href).toLowerCase();
-        const linear = String(it.linear || "yes").toLowerCase();
-        if (linear === "no") continue;
-        if (href.includes("cover") || href.includes("titlepage")) continue;
-        await rendition.display(it.href);
-        return true;
-      }
-    } catch(e){}
-
-    // 4) Ultime fallback
-    try { await rendition.display(); return true; } catch(e){}
-    return false;
+    elBooks.querySelectorAll("button[data-book]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-book");
+        const item = BOOKS.find(x => x.id === id);
+        if (item) openBook(item);
+      });
+    });
   }
 
-  async function safeNudge(item){
-    if (!rendition) return;
-    try { rendition.resize(); } catch(e){}
-    await new Promise(r => setTimeout(r, 80));
-    await displayStart(item);
-    await new Promise(r => setTimeout(r, 80));
-    try { rendition.resize(); } catch(e){}
+  function updateProgressUI(location){
+    const displayed = location && location.start && location.start.displayed;
+    const percent = percentFromLocation(location);
+
+    const pagePart = (displayed && displayed.page && displayed.total)
+      ? `Página ${displayed.page} / ${displayed.total}`
+      : "—";
+
+    const pctPart = (percent !== null)
+      ? ` • ${Math.round(percent * 100)}%`
+      : "";
+
+    elProgress.textContent = pagePart + pctPart;
   }
 
+  // ====== EPUB ======
   async function openBook(item) {
     clearError();
-    hookInstalled = false;
 
     currentItem = item;
     readingSeconds = loadReadingTime(item);
@@ -949,13 +851,20 @@ p,li,blockquote,div,section,article{
 
     showReader();
     elTitle.textContent = item.title || "Livro";
-    elProgress.textContent = "Carregando…";
+
+    const savedCfi = loadPosition(item);
+    elProgress.textContent = savedCfi ? "Retomando…" : "Carregando…";
     if (elSaveBadge) elSaveBadge.classList.remove("show");
 
     startReadingTimer();
 
     if (typeof window.ePub !== "function") {
-      showError("Não consegui carregar o epub.js (epub.min.js).");
+      showError(
+        "Não consegui carregar o epub.js.\n" +
+        "Verifique se existe o arquivo: epub.min.js\n" +
+        "na mesma pasta do arquivo HTML."
+      );
+      elProgress.textContent = "—";
       return;
     }
 
@@ -967,64 +876,87 @@ p,li,blockquote,div,section,article{
       book = null;
 
       const path = "epubs/" + item.file;
+
       const resp = await fetch(path);
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       const arrayBuffer = await resp.arrayBuffer();
 
       book = window.ePub(arrayBuffer);
-      if (book.ready) await book.ready;
 
-      rendition = book.renderTo("viewer", { width: "100%", height: "100%", spread: "none" });
+      // prepare locations for % progress (wait for book.ready, cache)
+      locReadyPromise = (book.ready ? book.ready.then(() => ensureLocations(item)) : ensureLocations(item));
 
-      // IMPORTANT: forcer le mode scroll AVANT tout display()
-      try { rendition.flow("scrolled-doc"); } catch(e){}
-      try { rendition.spread("none"); } catch(e){}
+      rendition = book.renderTo("viewer", {
+        width: "100%",
+        height: "100%",
+        spread: "none"
+      });
+
+      btnPrev.onclick = () => rendition && rendition.prev();
+      btnNext.onclick = () => rendition && rendition.next();
+
+      btnRestart.onclick = async () => {
+        if (!currentItem || !rendition) return;
+        clearPosition(currentItem);
+        elProgress.textContent = "Carregando…";
+        try { await rendition.display(); } catch(e) {}
+      };
+
+      btnFontMinus.onclick = () => {
+        fontPct = Math.max(80, fontPct - 10);
+        applyReadingPrefs();
+      };
+      btnFontPlus.onclick = () => {
+        fontPct = Math.min(200, fontPct + 10);
+        applyReadingPrefs();
+      };
+
+      btnJustify.onclick = () => {
+        justifyOn = !justifyOn;
+        applyThemeToRendition();
+      };
+
+      btnHyphen.onclick = () => {
+        hyphenOn = !hyphenOn;
+        applyThemeToRendition();
+      };
+
+      if (btnFs) btnFs.onclick = toggleFullscreen;
+      if (btnFsExit) btnFsExit.onclick = exitFullscreen;
 
       rendition.on("relocated", (location) => {
         savePosition(item, location);
         updateProgressUI(location);
       });
 
-      // Restart
-      btnRestart.onclick = async () => {
-        if (!currentItem || !rendition) return;
-        clearPosition(currentItem);
-        elProgress.textContent = "Carregando…";
-        const ok = await displayStart(currentItem);
-        if (!ok) { try { await rendition.display(); } catch(e) {} }
-        applyThemeToRendition();
-        if (item.nudge) await safeNudge(item);
-      };
+      rendition.on("rendered", () => applyThemeToRendition());
 
-      // Font
-      btnFontMinus.onclick = () => { fontPct = Math.max(80, fontPct - 10); applyReadingPrefs(); try{rendition.resize();}catch(e){} };
-      btnFontPlus.onclick  = () => { fontPct = Math.min(200, fontPct + 10); applyReadingPrefs(); try{rendition.resize();}catch(e){} };
-
-      // Layout
-      btnMargin.onclick = () => { marginPx = cycleValue(MARGIN_STEPS, marginPx); applyLayoutPrefs(); };
-      btnWidth.onclick  = () => { maxWidthCh = cycleValue(WIDTH_STEPS, maxWidthCh); applyLayoutPrefs(); };
-      btnJustify.onclick= () => { justifyOn = !justifyOn; applyLayoutPrefs(); };
-      btnHyphen.onclick = () => { hyphenOn = !hyphenOn; applyLayoutPrefs(); };
-
-      // Display initial (anti-cover)
-      const ok = await displayStart(item);
-      if (!ok) showError("Não consegui exibir um capítulo legível (TOC/spine).");
+      if (savedCfi) {
+        await rendition.display(savedCfi);
+      } else {
+        await rendition.display();
+      }
 
       applyThemeToRendition();
-      syncLayoutButtons();
+      syncJustifyHyphenButtons();
 
-      if (item.nudge) await safeNudge(item);
-
-      showNotice("DEBUG: scroll ok, start via TOC/spine ok.");
+      // Ensure locations ready then force a first % update
+      try {
+        await locReadyPromise;
+        const loc = rendition && rendition.currentLocation ? rendition.currentLocation() : null;
+        if (loc) updateProgressUI(loc);
+      } catch(e) {}
 
     } catch (err) {
       console.error(err);
-      showError("Falha ao abrir o EPUB.\nDetalhe técnico: " + (err && err.message ? err.message : String(err)));
+      showError(
+        "Falha ao abrir o EPUB.\n" +
+        "Detalhe técnico: " + (err && err.message ? err.message : String(err))
+      );
       elProgress.textContent = "—";
     }
   }
 
-  // Back
   btnBack.addEventListener("click", async () => {
     clearError();
     stopReadingTimer();
@@ -1032,15 +964,9 @@ p,li,blockquote,div,section,article{
     showCatalog();
   });
 
-  // Fullscreen buttons
-  if (btnFs) btnFs.addEventListener("click", toggleFullscreen);
-  if (btnFsExit) btnFsExit.addEventListener("click", exitFullscreen);
-
-  // Theme init
   initTheme();
-  syncLayoutButtons();
+  syncJustifyHyphenButtons();
   renderCatalog();
-
 })();
 </script>
 
