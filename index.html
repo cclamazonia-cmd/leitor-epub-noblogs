@@ -98,7 +98,7 @@ body.reader-open main{max-width:min(1200px, 96vw)}
 .card{
   background:var(--card);
   border:1px solid var(--border);
-  border-radius:var(--radius);
+  border-radius:16px;
   padding:16px;
   margin-bottom:16px;
   box-shadow:var(--shadow);
@@ -140,7 +140,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
 
 .viewer{
   border:1px solid var(--border);
-  border-radius:var(--radius);
+  border-radius:16px;
   overflow:hidden;
   background:var(--bg);
 }
@@ -178,7 +178,6 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   text-align:center;
 }
 
-/* Badges */
 .pill{
   font-size:12px;
   color:var(--muted);
@@ -201,10 +200,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   transition:opacity .18s ease, transform .18s ease;
   white-space:nowrap;
 }
-.save-badge.show{
-  opacity:1;
-  transform:translateY(0);
-}
+.save-badge.show{opacity:1;transform:translateY(0)}
 
 #viewer{
   width:100%;
@@ -299,13 +295,11 @@ body.reader-open .footer{display:none}
 (() => {
   "use strict";
 
-  // ====== CONFIG ======
   const BOOKS = [
     { id: "extrativismo", title: "Extrativismo", author: "Anna Bednik e Jérémy Dotti", file: "extrativismo.epub" },
     { id: "geografia-libertaria", title: "Por uma Geografia libertária", author: "Marcelo Lopes de Souza", file: "mls.epub" }
   ];
 
-  // ====== DOM ======
   const elCatalogo = document.getElementById("catalogo");
   const elLeitor = document.getElementById("leitor");
   const elBooks = document.getElementById("books");
@@ -323,25 +317,20 @@ body.reader-open .footer{display:none}
   const btnFontMinus = document.getElementById("fontMinus");
   const btnFontPlus  = document.getElementById("fontPlus");
 
-  // ====== STATE ======
   let book = null;
   let rendition = null;
   let currentItem = null;
 
-  // Font size persisted
   let fontPct = Number(localStorage.getItem("fontPct") || 110);
 
-  // Badge timer
   let saveBadgeTimer = null;
 
-  // Reading timer (30s ticks)
+  // ===== TIMER (FIXED) =====
   let readingSeconds = 0;
-  let readingTimerId = null;
+  let readingTimeoutId = null;
 
-  // Promise for locations readiness (progress %)
   let locReadyPromise = Promise.resolve(false);
 
-  // ====== UTIL ======
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>"']/g, (m) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
@@ -377,12 +366,14 @@ body.reader-open .footer{display:none}
     saveBadgeTimer = setTimeout(() => elSaveBadge.classList.remove("show"), 1400);
   }
 
-  // ====== PROGRESS SAVE (CFI) ======
   function storageKeyForBook(item) {
     return "pos:" + (item && item.id ? item.id : "unknown");
   }
   function timeKeyForBook(item) {
     return "time:" + (item && item.id ? item.id : "unknown");
+  }
+  function locKeyForBook(item){
+    return "loc:" + (item && item.id ? item.id : "unknown");
   }
 
   function savePosition(item, location) {
@@ -391,7 +382,7 @@ body.reader-open .footer{display:none}
       if (!cfi) return;
       localStorage.setItem(storageKeyForBook(item), cfi);
       showSavedBadge();
-    } catch(e) { /* ignore */ }
+    } catch(e) {}
   }
 
   function loadPosition(item) {
@@ -401,38 +392,28 @@ body.reader-open .footer{display:none}
 
   function clearPosition(item) {
     try { localStorage.removeItem(storageKeyForBook(item)); }
-    catch(e){ /* ignore */ }
-  }
-
-  // ====== LOCATIONS (for % progress) ======
-  function locKeyForBook(item){
-    return "loc:" + (item && item.id ? item.id : "unknown");
+    catch(e){}
   }
 
   async function ensureLocations(item){
     if (!book || !book.locations) return false;
 
     try {
-      // IMPORTANT: wait for the book to be ready
       if (book.ready) await book.ready;
 
-      // already ready?
       if (typeof book.locations.length === "function" && book.locations.length() > 0) return true;
 
-      // try load cached locations
       const saved = localStorage.getItem(locKeyForBook(item));
       if (saved) {
         book.locations.load(saved);
         if (book.locations.length() > 0) return true;
       }
 
-      // generate locations (needed for a stable %)
       await book.locations.generate(1024);
 
-      // cache for next time
       try {
         localStorage.setItem(locKeyForBook(item), book.locations.save());
-      } catch(e) { /* ignore quota errors */ }
+      } catch(e) {}
 
       return (typeof book.locations.length === "function" && book.locations.length() > 0);
     } catch(e) {
@@ -443,19 +424,16 @@ body.reader-open .footer{display:none}
   function percentFromLocation(location){
     const displayed = location && location.start && location.start.displayed;
 
-    // 1) direct percentage if provided
     const p = location && location.start && location.start.percentage;
     if (typeof p === "number" && isFinite(p)) {
       const pp = Math.max(0, Math.min(1, p));
-      // Ignore degenerate 100% if we are clearly not at the end
       if (displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99) {
-        // fall through
+        // ignore degenerate
       } else {
         return pp;
       }
     }
 
-    // 2) fallback via CFI + locations (only if locations ready)
     const cfi = location && location.start && location.start.cfi;
     if (!cfi || !book || !book.locations || typeof book.locations.length !== "function") return null;
     if (book.locations.length() === 0) return null;
@@ -474,7 +452,7 @@ body.reader-open .footer{display:none}
     return null;
   }
 
-  // ====== READING TIME ======
+  // ====== TIMER HELPERS (setTimeout loop) ======
   function loadReadingTime(item){
     try {
       const v = Number(localStorage.getItem(timeKeyForBook(item)) || 0);
@@ -487,16 +465,14 @@ body.reader-open .footer{display:none}
   function saveReadingTime(item){
     try {
       localStorage.setItem(timeKeyForBook(item), String(readingSeconds));
-    } catch(e){ /* ignore */ }
+    } catch(e){}
   }
 
   function formatTime(sec){
     const s = Math.max(0, Math.floor(sec));
     const mm = Math.floor(s / 60);
     const ss = s % 60;
-    const m2 = String(mm).padStart(2,"0");
-    const s2 = String(ss).padStart(2,"0");
-    return `${m2}:${s2}`;
+    return `${String(mm).padStart(2,"0")}:${String(ss).padStart(2,"0")}`;
   }
 
   function updateTimeUI(){
@@ -505,32 +481,34 @@ body.reader-open .footer{display:none}
   }
 
   function stopReadingTimer(){
-    if (readingTimerId) clearInterval(readingTimerId);
-    readingTimerId = null;
+    if (readingTimeoutId) clearTimeout(readingTimeoutId);
+    readingTimeoutId = null;
   }
 
-  function startReadingTimer(){
+  function scheduleNextTick(){
     stopReadingTimer();
-    updateTimeUI();
-
-    readingTimerId = setInterval(() => {
+    readingTimeoutId = setTimeout(() => {
+      // re-check conditions at each tick
       const readerOpen = document.body.classList.contains("reader-open");
-      if (!readerOpen) return;
-      if (document.visibilityState !== "visible") return;
-      if (!currentItem) return;
-
-      readingSeconds += 30;
-      saveReadingTime(currentItem);
-      updateTimeUI();
+      const visible = (document.visibilityState === "visible");
+      if (readerOpen && visible && currentItem) {
+        readingSeconds += 30;
+        saveReadingTime(currentItem);
+        updateTimeUI();
+      }
+      scheduleNextTick(); // loop
     }, 30000);
   }
 
+  function startReadingTimer(){
+    updateTimeUI();      // immediate UI refresh
+    scheduleNextTick();  // start loop
+  }
+
   document.addEventListener("visibilitychange", () => {
-    if (!currentItem) return;
     updateTimeUI();
   });
 
-  // ====== READING PREFS ======
   function applyReadingPrefs() {
     if (!rendition) return;
     try {
@@ -539,7 +517,6 @@ body.reader-open .footer{display:none}
     } catch(e) {}
   }
 
-  // ====== THEME ======
   function applyThemeToRendition() {
     if (!rendition) return;
 
@@ -582,7 +559,6 @@ body.reader-open .footer{display:none}
     btnNight.addEventListener("click", () => setTheme(!document.body.classList.contains("night")));
   }
 
-  // ====== UI ======
   function renderCatalog() {
     if (!elBooks) return;
 
@@ -630,7 +606,6 @@ body.reader-open .footer{display:none}
     elProgress.textContent = pagePart + pctPart;
   }
 
-  // ====== EPUB ======
   async function openBook(item) {
     clearError();
 
@@ -672,7 +647,6 @@ body.reader-open .footer{display:none}
 
       book = window.ePub(arrayBuffer);
 
-      // prepare locations for % progress (wait for book.ready, cache)
       locReadyPromise = (book.ready ? book.ready.then(() => ensureLocations(item)) : ensureLocations(item));
 
       rendition = book.renderTo("viewer", {
@@ -715,12 +689,11 @@ body.reader-open .footer{display:none}
 
       applyThemeToRendition();
 
-      // Ensure locations ready then force a first % update
       try {
         await locReadyPromise;
         const loc = rendition && rendition.currentLocation ? rendition.currentLocation() : null;
         if (loc) updateProgressUI(loc);
-      } catch(e) { /* ignore */ }
+      } catch(e) {}
 
     } catch (err) {
       console.error(err);
