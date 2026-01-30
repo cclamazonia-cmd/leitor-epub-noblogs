@@ -266,6 +266,16 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   background:var(--bg);
 }
 
+/* === FIX 1/2 : autoriser le scroll dans #viewer en mode scrolled-doc === */
+body.flow-scroll #viewer{
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
+}
+/* === FIX 2/2 : éviter un scroll parasite en mode paginated === */
+body.flow-pages #viewer{
+  overflow:hidden;
+}
+
 /* Masquer les flèches en mode scroll */
 body.flow-scroll #prevBtn,
 body.flow-scroll #nextBtn{
@@ -634,7 +644,7 @@ body.reader-open .footer{display:none}
   }
 
   function stopReadingTimer(){
-    if (rafId) cancelAnimationFrame(rafId);
+    if (rafId) cancelAnimationFrame(rafLoop);
     rafId = null;
     commitChunks();
     carryMs = 0;
