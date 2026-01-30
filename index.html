@@ -338,6 +338,9 @@ body.reader-open .footer{display:none}
   let readingSeconds = 0;
   let readingTimerId = null;
 
+  // Promise for locations readiness (progress %)
+  let locReadyPromise = Promise.resolve(false);
+
   // ====== UTIL ======
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>"']/g, (m) => ({
@@ -401,6 +404,54 @@ body.reader-open .footer{display:none}
     catch(e){ /* ignore */ }
   }
 
+  // ====== LOCATIONS (for % progress) ======
+  function locKeyForBook(item){
+    return "loc:" + (item && item.id ? item.id : "unknown");
+  }
+
+  async function ensureLocations(item){
+    if (!book || !book.locations) return false;
+
+    try {
+      // already loaded?
+      if (typeof book.locations.length === "function" && book.locations.length() > 0) return true;
+
+      // try load cached locations
+      const saved = localStorage.getItem(locKeyForBook(item));
+      if (saved) {
+        book.locations.load(saved);
+        if (book.locations.length() > 0) return true;
+      }
+
+      // generate locations (needed for a stable %)
+      await book.locations.generate(1024);
+
+      // cache for next time
+      try {
+        localStorage.setItem(locKeyForBook(item), book.locations.save());
+      } catch(e) { /* ignore quota errors */ }
+
+      return (typeof book.locations.length === "function" && book.locations.length() > 0);
+    } catch(e) {
+      return false;
+    }
+  }
+
+  function percentFromLocation(location){
+    // 1) direct percentage if provided
+    const p = location && location.start && location.start.percentage;
+    if (typeof p === "number" && isFinite(p)) return Math.max(0, Math.min(1, p));
+
+    // 2) fallback via CFI + locations
+    const cfi = location && location.start && location.start.cfi;
+    if (cfi && book && book.locations && typeof book.locations.percentageFromCfi === "function") {
+      const px = book.locations.percentageFromCfi(cfi);
+      if (typeof px === "number" && isFinite(px)) return Math.max(0, Math.min(1, px));
+    }
+
+    return null;
+  }
+
   // ====== READING TIME ======
   function loadReadingTime(item){
     try {
@@ -440,7 +491,6 @@ body.reader-open .footer{display:none}
     stopReadingTimer();
     updateTimeUI();
 
-    // tick toutes les 30 sec, mais uniquement si lecteur ouvert + onglet visible
     readingTimerId = setInterval(() => {
       const readerOpen = document.body.classList.contains("reader-open");
       if (!readerOpen) return;
@@ -453,10 +503,8 @@ body.reader-open .footer{display:none}
     }, 30000);
   }
 
-  // Pause/relance automatique selon visibilité
   document.addEventListener("visibilitychange", () => {
     if (!currentItem) return;
-    // on ne “rattrape” pas le temps hors focus : simple & robuste
     updateTimeUI();
   });
 
@@ -545,15 +593,9 @@ body.reader-open .footer{display:none}
     });
   }
 
-  function computePercentFromLocation(location){
-    const p = location && location.start && location.start.percentage;
-    if (typeof p === "number" && isFinite(p)) return Math.max(0, Math.min(1, p));
-    return null;
-  }
-
   function updateProgressUI(location){
     const displayed = location && location.start && location.start.displayed;
-    const percent = computePercentFromLocation(location);
+    const percent = percentFromLocation(location);
 
     const pagePart = (displayed && displayed.page && displayed.total)
       ? `Página ${displayed.page} / ${displayed.total}`
@@ -608,6 +650,9 @@ body.reader-open .footer{display:none}
 
       book = window.ePub(arrayBuffer);
 
+      // prepare locations for % progress (async, cached)
+      locReadyPromise = ensureLocations(item);
+
       rendition = book.renderTo("viewer", {
         width: "100%",
         height: "100%",
@@ -647,6 +692,14 @@ body.reader-open .footer{display:none}
       }
 
       applyThemeToRendition();
+
+      // Ensure locations ready then force a first % update
+      try {
+        await locReadyPromise;
+        const loc = rendition && rendition.currentLocation ? rendition.currentLocation() : null;
+        if (loc) updateProgressUI(loc);
+      } catch(e) { /* ignore */ }
+
     } catch (err) {
       console.error(err);
       showError(
