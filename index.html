@@ -332,7 +332,7 @@ body.reader-open .footer{display:none}
     <strong>Biblioteca</strong>
     <span class="tagline">Leitor EPUB • Editora CCLA</span>
   </div>
-  <button class="btn" id="toggleNight" type="button" aria-label="Alternar tema">🌙 Noite</button>
+  <button class="btn" id="toggleNight" type="button" aria-label="Alternar tema" title="Alternar tema">🌙 Noite</button>
 </header>
 
 <main>
@@ -344,35 +344,35 @@ body.reader-open .footer{display:none}
 
   <section id="leitor" class="card" style="display:none;">
     <div class="reader-top">
-      <button class="btn" id="backBtn" type="button">← Catálogo</button>
+      <button class="btn" id="backBtn" type="button" title="Voltar ao catálogo">← Catálogo</button>
       <div class="reader-title" id="bookTitle">Carregando…</div>
     </div>
 
     <div class="viewer" id="viewerShell">
       <div class="viewer-toolbar">
         <div class="viewer-left">
-          <button class="btn" id="prevBtn" type="button" aria-label="Página anterior">←</button>
-          <button class="btn" id="restartBtn" type="button" aria-label="Recomeçar do início">Recomeçar</button>
-          <button class="btn" id="fsBtn" type="button" aria-label="Tela cheia">⛶</button>
+          <button class="btn" id="prevBtn" type="button" aria-label="Página anterior" title="Página anterior">←</button>
+          <button class="btn" id="restartBtn" type="button" aria-label="Recomeçar do início" title="Recomeçar do início">Recomeçar</button>
+          <button class="btn" id="fsBtn" type="button" aria-label="Tela cheia" title="Tela cheia">⛶</button>
         </div>
 
         <div class="viewer-center">
-          <button class="btn" id="fontMinus" type="button" aria-label="Diminuir fonte">A−</button>
+          <button class="btn" id="fontMinus" type="button" aria-label="Diminuir fonte" title="Diminuir fonte">A−</button>
           <div class="viewer-hint" id="progress">—</div>
-          <button class="btn" id="fontPlus" type="button" aria-label="Aumentar fonte">A+</button>
+          <button class="btn" id="fontPlus" type="button" aria-label="Aumentar fonte" title="Aumentar fonte">A+</button>
         </div>
 
         <div class="viewer-right">
-          <button class="btn" id="justifyBtn" type="button" aria-label="Justificação">J</button>
-          <button class="btn" id="hyphenBtn" type="button" aria-label="Hifenização">Hy</button>
+          <button class="btn" id="justifyBtn" type="button" aria-label="Justificação" title="Alternar justificação">J</button>
+          <button class="btn" id="hyphenBtn" type="button" aria-label="Hifenização" title="Alternar hifenização">Hy</button>
 
           <span class="pill" id="timePill" aria-label="Tempo de leitura">Tempo: 00:00</span>
           <span class="save-badge" id="saveBadge" aria-live="polite">Última leitura salva ✅</span>
-          <button class="btn" id="nextBtn" type="button" aria-label="Próxima página">→</button>
+          <button class="btn" id="nextBtn" type="button" aria-label="Próxima página" title="Próxima página">→</button>
         </div>
       </div>
 
-      <button class="fullscreen-exit" id="fsExitBtn" type="button" aria-label="Sair da tela cheia">⤫ Sair</button>
+      <button class="fullscreen-exit" id="fsExitBtn" type="button" aria-label="Sair da tela cheia" title="Sair da tela cheia">⤫ Sair</button>
       <div id="viewer" aria-label="Área de leitura"></div>
     </div>
 
@@ -622,7 +622,7 @@ body.reader-open .footer{display:none}
   }
 
   function stopReadingTimer(){
-    if (rafId) cancelAnimationFrame(rafId); // FIX: annuler l'id, pas la fonction
+    if (rafId) cancelAnimationFrame(rafId);
     rafId = null;
     commitChunks();
     carryMs = 0;
