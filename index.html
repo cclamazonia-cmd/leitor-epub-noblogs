@@ -12,21 +12,8 @@
   --muted:#666666;
   --card:#f5f5f5;
   --border:#dddddd;
-  --btnbg:transparent;
-  --btnfg:var(--fg);
   --accent:#111111;
   --accentfg:#ffffff;
-.footer{
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  padding:24px 16px 32px;
-}
-
-.footer-logo{
-  max-height:150px;
-  width:auto;
-  opacity:0.95;
 }
 
 body.night{
@@ -35,8 +22,6 @@ body.night{
   --muted:#a6b0bb;
   --card:#171a21;
   --border:#262b36;
-  --btnbg:transparent;
-  --btnfg:var(--fg);
   --accent:#e9edf1;
   --accentfg:#0f1115;
 }
@@ -60,7 +45,6 @@ header{
   display:flex;
   justify-content:space-between;
   align-items:center;
-  gap:12px;
 }
 
 header strong{
@@ -71,8 +55,8 @@ header strong{
 .btn{
   padding:8px 10px;
   border:1px solid var(--border);
-  background:var(--btnbg);
-  color:var(--btnfg);
+  background:none;
+  color:var(--fg);
   border-radius:10px;
   cursor:pointer;
   font-size:14px;
@@ -98,8 +82,16 @@ main{
   margin-bottom:16px;
 }
 
-h2{margin:0 0 8px 0;font-size:18px}
-p{margin:0 0 12px 0;color:var(--muted);line-height:1.5}
+h2{
+  margin:0 0 8px 0;
+  font-size:18px;
+}
+
+p{
+  margin:0 0 12px 0;
+  color:var(--muted);
+  line-height:1.5;
+}
 
 .book{
   display:flex;
@@ -113,77 +105,36 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.5}
   margin-bottom:10px;
 }
 
-.book strong{display:block;font-size:15px}
-.book small{color:var(--muted)}
-
-.reader-top{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:10px;
-  margin-bottom:10px;
-}
-
-.reader-title{
+.book strong{
+  display:block;
   font-size:15px;
+}
+
+.book small{
   color:var(--muted);
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-  max-width:65%;
 }
 
-.viewer{
-  border:1px solid var(--border);
-  border-radius:14px;
-  overflow:hidden;
-  background:var(--bg);
-}
-
-.viewer-toolbar{
+/* Footer logo */
+.footer{
   display:flex;
-  justify-content:space-between;
+  justify-content:center;
   align-items:center;
-  gap:10px;
-  padding:10px;
-  border-bottom:1px solid var(--border);
-  background:var(--card);
+  padding:32px 16px 40px;
 }
 
-.viewer-hint{
-  color:var(--muted);
-  font-size:13px;
-}
-
-#viewer{
-  width:100%;
-  height:70vh;
-  background:var(--bg);
-}
-
-.notice{
-  margin-top:10px;
-  padding:10px;
-  border:1px dashed var(--border);
-  border-radius:12px;
-  color:var(--muted);
-  background:color-mix(in srgb, var(--card) 75%, var(--bg));
-}
-
-code{
-  padding:2px 6px;
-  border-radius:8px;
-  border:1px solid var(--border);
-  background:var(--bg);
-  color:var(--fg);
+.footer-logo{
+  max-height:150px;
+  width:auto;
+  opacity:0.95;
 }
 </style>
 </head>
 
 <body>
+
 <header>
   <strong>Biblioteca</strong>
-  <button class="btn" id="toggleNight" type="button" aria-label="Alternar tema">🌙 Noite</button>
+  <button class="btn" id="toggleNight" type="button">🌙 Noite</button>
 </header>
 
 <main>
@@ -196,255 +147,58 @@ code{
     <div id="books"></div>
   </section>
 
-<footer class="footer">
-  <img
-    src="assets/CCLA_Editora.png"
-    alt="Editora CCLA"
-    class="footer-logo"
-  >
-</footer>
-  
-  <!-- LEITOR -->
-  <section id="leitor" class="card" style="display:none;">
-    <div class="reader-top">
-      <button class="btn" id="backBtn" type="button">← Catálogo</button>
-      <div class="reader-title" id="bookTitle">Carregando…</div>
-    </div>
-
-    <div class="viewer">
-      <div class="viewer-toolbar">
-        <button class="btn" id="prevBtn" type="button" aria-label="Página anterior">←</button>
-        <div class="viewer-hint" id="progress">—</div>
-        <button class="btn" id="nextBtn" type="button" aria-label="Próxima página">→</button>
-      </div>
-      <div id="viewer" aria-label="Área de leitura"></div>
-    </div>
-
-    <div id="errorBox" class="notice" style="display:none;"></div>
-  </section>
+  <!-- FOOTER LOGO -->
+  <footer class="footer">
+    <img
+      src="assets/CCLA_Editora.png"
+      alt="Editora CCLA"
+      class="footer-logo"
+    >
+  </footer>
 
 </main>
 
-<script src="jszip.min.js"></script>
-<script src="epub.min.js"></script>
 <script>
-(() => {
-  "use strict";
+/* Catalogue simple (affichage seulement) */
+const BOOKS = [
+  { title: "Extrativismo", author: "Anna Bednik e Jérémy Dotti" },
+  { title: "Por uma Geografia libertária", author: "Marcelo Lopes de Souza" }
+];
 
-  // ====== CONFIG ======
-  // Mets ici tes livres (fichiers dans epubs/)
-  const BOOKS = [
-    { id: "extrativismo", title: "Extrativismo", author: "Anna Bednik e Jérémy Dotti", file: "extrativismo.epub" },
-    { id: "geografia-libertaria", title: "Por uma Geografia libertária", author: "Marcelo Lopes de Souza", file: "mls.epub" }
-  ];
+const booksEl = document.getElementById("books");
+const btnNight = document.getElementById("toggleNight");
 
-  // ====== DOM ======
-  const elCatalogo = document.getElementById("catalogo");
-  const elLeitor = document.getElementById("leitor");
-  const elBooks = document.getElementById("books");
-  const elTitle = document.getElementById("bookTitle");
-  const elProgress = document.getElementById("progress");
-  const elError = document.getElementById("errorBox");
-
-  const btnNight = document.getElementById("toggleNight");
-  const btnBack = document.getElementById("backBtn");
-  const btnPrev = document.getElementById("prevBtn");
-  const btnNext = document.getElementById("nextBtn");
-
-  // ====== STATE ======
-  let book = null;
-  let rendition = null;
-  let currentBook = null;
-
-  // ====== UTIL ======
-  function escapeHtml(value) {
-    return String(value ?? "").replace(/[&<>"']/g, (m) => ({
-      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
-    }[m]));
-  }
-
-  function showError(message) {
-    elError.style.display = "block";
-    elError.innerHTML = escapeHtml(message).replace(/\n/g, "<br>");
-  }
-
-  function clearError() {
-    elError.style.display = "none";
-    elError.textContent = "";
-  }
-
-  function showReader() {
-    elCatalogo.style.display = "none";
-    elLeitor.style.display = "block";
-  }
-
-  function showCatalog() {
-    elLeitor.style.display = "none";
-    elCatalogo.style.display = "block";
-  }
-
-  // ====== THEME ======
-  function applyThemeToRendition() {
-    if (!rendition) return;
-    const night = document.body.classList.contains("night");
-
-    rendition.themes.register("app", {
-      "body": {
-        "background": night ? "#0f1115" : "#ffffff",
-        "color": night ? "#e9edf1" : "#111111"
-      },
-      "a": {
-        "color": night ? "#8ab4f8" : "#0b57d0"
-      }
-    });
-    rendition.themes.select("app");
-  }
-
-  function setTheme(isNight) {
-    document.body.classList.toggle("night", isNight);
-    localStorage.setItem("theme", isNight ? "night" : "day");
-    btnNight.textContent = isNight ? "☀️ Dia" : "🌙 Noite";
-    btnNight.setAttribute("aria-label", isNight ? "Ativar modo dia" : "Ativar modo noite");
-    applyThemeToRendition();
-  }
-
-  function initTheme() {
-    const saved = localStorage.getItem("theme");
-    setTheme(saved === "night");
-    btnNight.addEventListener("click", () => {
-      setTheme(!document.body.classList.contains("night"));
-    });
-  }
-
-  // ====== UI ======
-  function renderCatalog() {
-    if (!elBooks) return;
-
-    if (!Array.isArray(BOOKS) || BOOKS.length === 0) {
-      elBooks.innerHTML = `
-        <div class="notice">
-          Nenhum livro configurado.<br>
-          Adicione arquivos <code>.epub</code> em <code>epubs/</code> e atualize a lista no código.
-        </div>
-      `;
-      return;
-    }
-
-    elBooks.innerHTML = BOOKS.map(b => `
-      <div class="book">
-        <div>
-          <strong>${escapeHtml(b.title)}</strong>
-          <small>${escapeHtml(b.author || "")}</small>
-        </div>
-        <button class="btn btn-primary" type="button" data-book="${escapeHtml(b.id)}">Ler</button>
+function renderBooks(){
+  booksEl.innerHTML = BOOKS.map(b => `
+    <div class="book">
+      <div>
+        <strong>${b.title}</strong>
+        <small>${b.author}</small>
       </div>
-    `).join("");
+      <span class="btn btn-primary">Ler</span>
+    </div>
+  `).join("");
+}
 
-    elBooks.querySelectorAll("button[data-book]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const id = btn.getAttribute("data-book");
-        const item = BOOKS.find(x => x.id === id);
-        if (item) openBook(item);
-      });
-    });
-  }
+function initTheme(){
+  const saved = localStorage.getItem("theme");
+  if(saved === "night") document.body.classList.add("night");
 
-  // ====== EPUB (robuste en local) ======
-  async function openBook(item) {
-    clearError();
-    currentBook = item;
+  btnNight.textContent = document.body.classList.contains("night")
+    ? "☀️ Dia"
+    : "🌙 Noite";
 
-    showReader();
-    elTitle.textContent = item.title || "Livro";
-    elProgress.textContent = "Carregando…";
+  btnNight.onclick = () => {
+    document.body.classList.toggle("night");
+    const night = document.body.classList.contains("night");
+    localStorage.setItem("theme", night ? "night" : "day");
+    btnNight.textContent = night ? "☀️ Dia" : "🌙 Noite";
+  };
+}
 
-    if (typeof window.ePub !== "function") {
-      showError(
-        "Não consegui carregar o epub.js.\n" +
-        "Verifique se existe o arquivo: epub.min.js\n" +
-        "na mesma pasta do arquivo HTML."
-      );
-      return;
-    }
-
-    try {
-      // Nettoyage
-      if (rendition) {
-        try { rendition.destroy(); } catch(e) {}
-        rendition = null;
-      }
-      book = null;
-
-      const path = "epubs/" + item.file;
-
-      // Chargement binaire (plus fiable en local)
-      let arrayBuffer;
-      try {
-        const resp = await fetch(path);
-        if (!resp.ok) throw new Error("HTTP " + resp.status);
-        arrayBuffer = await resp.arrayBuffer();
-      } catch (e) {
-        showError(
-          "Não consegui acessar o arquivo EPUB.\n" +
-          "Verifique se ele existe em epubs/ e se o nome está correto:\n" +
-          item.file + "\n\n" +
-          "Observação: em alguns navegadores, abrir por duplo-clique (file:///) pode bloquear o acesso."
-        );
-        elProgress.textContent = "—";
-        return;
-      }
-
-      book = window.ePub(arrayBuffer);
-
-      rendition = book.renderTo("viewer", {
-        width: "100%",
-        height: "70vh",
-        spread: "none"
-      });
-
-      // Navigation
-      btnPrev.onclick = () => rendition && rendition.prev();
-      btnNext.onclick = () => rendition && rendition.next();
-
-      rendition.on("relocated", (location) => {
-        const displayed = location && location.start && location.start.displayed;
-        if (displayed && displayed.page && displayed.total) {
-          elProgress.textContent = `Página ${displayed.page} / ${displayed.total}`;
-        } else {
-          elProgress.textContent = "—";
-        }
-      });
-
-      rendition.on("rendered", () => applyThemeToRendition());
-
-      await rendition.display();
-      applyThemeToRendition();
-
-      elProgress.textContent = "—";
-    } catch (err) {
-      console.error(err);
-      showError(
-        "Falha ao abrir o EPUB.\n" +
-        "Detalhe técnico: " + (err && err.message ? err.message : String(err))
-      );
-      elProgress.textContent = "—";
-    }
-  }
-
-  // Retour
-  btnBack.addEventListener("click", () => {
-    clearError();
-    showCatalog();
-  });
-
-  // Démarrage
-  initTheme();
-  renderCatalog();
-})();
+renderBooks();
+initTheme();
 </script>
 
 </body>
 </html>
-
-
-
