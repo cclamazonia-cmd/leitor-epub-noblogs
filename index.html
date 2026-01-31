@@ -378,7 +378,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   color: var(--muted);
 }
 
-/* ✅ (AJOUT) style mini pour "mostrar senha" — reste dans ton style */
+/* ✅ style mini pour "mostrar senha" */
 .restricted-row .showpw-label{
   display:flex;
   gap:8px;
@@ -850,7 +850,7 @@ body.night .btn *{ color: inherit !important; }
       <div class="restricted-row">
         <input id="pwInput" type="password" placeholder="Senha…" aria-label="Senha do catálogo restrito">
 
-        <!-- ✅ (AJOUT) Mostrar/ocultar senha -->
+        <!-- ✅ Mostrar/ocultar senha -->
         <label class="showpw-label" title="Mostrar/ocultar a senha digitada">
           <input id="showPwChk" type="checkbox" aria-label="Mostrar senha">
           mostrar senha
@@ -1036,7 +1036,7 @@ body.night .btn *{ color: inherit !important; }
   const restrictedStatus = document.getElementById("restrictedStatus");
   const privateArea = document.getElementById("privateArea");
 
-  // ✅ (AJOUT) checkbox mostrar/ocultar senha
+  // ✅ checkbox mostrar/ocultar senha
   const showPwChk = document.getElementById("showPwChk");
 
   const drawerBackdrop = document.getElementById("drawerBackdrop");
@@ -1098,7 +1098,7 @@ body.night .btn *{ color: inherit !important; }
       .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   }
 
-  // ✅ (AJOUT) helpers montrer/cacher senha + reset en fin de session
+  // ✅ helpers montrer/cacher senha + reset
   function resetPasswordVisibility(){
     try{
       if (pwInput) pwInput.type = "password";
@@ -1250,7 +1250,7 @@ body.night .btn *{ color: inherit !important; }
     if (currentItem) saveReadingTime(currentItem);
   });
 
-  // ✅ (AJOUT) reset “mostrar senha” à la sortie de session
+  // ✅ reset “mostrar senha” à la sortie de session
   window.addEventListener("pagehide", resetPasswordVisibility);
   window.addEventListener("beforeunload", resetPasswordVisibility);
 
@@ -1813,7 +1813,7 @@ table, thead, tbody, tr, td, th { background: transparent !important; }
     return bytesToHex(new Uint8Array(hash));
   }
 
-  // ✅ (AJOUT) wiring du checkbox mostrar/ocultar
+  // ✅ wiring du checkbox mostrar/ocultar
   if (showPwChk) {
     showPwChk.addEventListener("change", applyPasswordVisibilityFromUI);
   }
@@ -1832,7 +1832,10 @@ table, thead, tbody, tr, td, th { background: transparent !important; }
         setUnlocked(!!rememberChk.checked); // lembrar = persistant (localStorage)
         pwInput.value = "";
 
-        // ✅ Version 1: show everything immediately after unlock
+        // ✅ au déblocage : remet aussi l'input en password + décoche "mostrar senha"
+        resetPasswordVisibility();
+
+        // ✅ show everything immediately after unlock
         if (scopeSelect) scopeSelect.value = "all";
 
         updatePrivateUI();
@@ -1848,7 +1851,8 @@ table, thead, tbody, tr, td, th { background: transparent !important; }
     clearUnlocked();
     updatePrivateUI();
 
-    // ✅ (AJOUT) au clic "Bloquear", on masque aussi la saisie
+    // ✅ au clic "Bloquear", on masque aussi la saisie + vide le champ
+    if (pwInput) pwInput.value = "";
     resetPasswordVisibility();
   });
 
