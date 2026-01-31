@@ -6,7 +6,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-/* (CSS identique à la version précédente) */
 :root{
   --bg:#ffffff;
   --fg:#111111;
@@ -23,13 +22,18 @@
   --font-ui:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
   --font-reading:ui-serif,"Georgia","Times New Roman",Times,serif;
 
+  /* ===== Catalogue background (fixed, not theme-dependent) ===== */
   --catalog-bg-url:url("https://cclamazonia.noblogs.org/files/2024/11/Arte-CCLA-paredao.jpg");
+
+  /* ===== Reader watermark (same image, very subtle) ===== */
   --reader-watermark-opacity: .10;
 
+  /* Reader prefs (CSS vars used by injected hard CSS) */
   --read-line-height: 1.65;
   --read-pad: 18px;
   --read-font: var(--font-reading);
 
+  /* UI tokens */
   --ui-surface: color-mix(in srgb, var(--card) 86%, transparent);
   --ui-surface-strong: color-mix(in srgb, var(--card) 94%, var(--bg));
   --ui-border: color-mix(in srgb, var(--border) 70%, transparent);
@@ -61,6 +65,8 @@ body.night{
   --accentfg:#0f1115;
 
   --shadow:0 12px 34px rgba(0,0,0,.35);
+
+  /* Slightly different opacity at night so it's still subtle */
   --reader-watermark-opacity: .08;
 
   --ui-shadow: 0 14px 30px rgba(0,0,0,.40);
@@ -73,6 +79,8 @@ body.night{
 
 *{box-sizing:border-box}
 html,body{height:100%}
+
+/* ===== Base page ===== */
 body{
   margin:0;
   font-family:var(--font-ui);
@@ -81,6 +89,8 @@ body{
   -webkit-font-smoothing:antialiased;
   text-rendering:optimizeLegibility;
 }
+
+/* ===== Catalogue-only background image (does NOT change with theme) ===== */
 body:not(.reader-open){
   background-image: var(--catalog-bg-url);
   background-size: cover;
@@ -88,10 +98,14 @@ body:not(.reader-open){
   background-repeat: no-repeat;
   background-attachment: fixed;
 }
+
+/* When reader is open: remove image and use theme background */
 body.reader-open{
   background-image: none;
   background: var(--bg);
 }
+
+/* ===== Make catalogue readable on top of background image ===== */
 body:not(.reader-open)::before{
   content:"";
   position:fixed;
@@ -104,6 +118,8 @@ body:not(.reader-open)::before{
   );
   pointer-events:none;
 }
+
+/* ===== Reader subtle watermark (light veil showing the same image) ===== */
 body.reader-open::after{
   content:"";
   position:fixed;
@@ -118,10 +134,13 @@ body.reader-open::after{
   opacity: var(--reader-watermark-opacity);
   filter: saturate(110%) contrast(105%);
 }
+
+/* Ensure app content stays above overlays */
 header, main, footer{
   position:relative;
   z-index:1;
 }
+
 header{
   position:sticky;
   top:0;
@@ -135,12 +154,16 @@ header{
   align-items:center;
   gap:12px;
 }
+
+/* Left: back-to-blog button */
 .header-left{
   display:flex;
   align-items:center;
   justify-content:flex-start;
   min-width:0;
 }
+
+/* Center: title */
 .brand{
   display:flex;
   flex-direction:column;
@@ -149,14 +172,23 @@ header{
   gap:2px;
   text-align:center;
 }
-header strong{font-size:18px;letter-spacing:.2px}
-.tagline{font-size:13px;color:var(--muted)}
+header strong{
+  font-size:18px;
+  letter-spacing:.2px;
+}
+.tagline{
+  font-size:13px;
+  color:var(--muted);
+}
+
+/* Right: theme toggle */
 .header-right{
   display:flex;
   align-items:center;
   justify-content:flex-end;
   min-width:0;
 }
+
 .btn{
   padding:10px 12px;
   border:1px solid var(--border);
@@ -176,13 +208,20 @@ header strong{font-size:18px;letter-spacing:.2px}
 .btn:hover{background:color-mix(in srgb, var(--card) 55%, var(--bg))}
 .btn:active{transform:scale(.98)}
 .btn:focus{outline:2px solid color-mix(in srgb, var(--accent) 35%, transparent);outline-offset:2px}
+
 .btn-primary{
   border-color:transparent;
   background:var(--accent);
   color:var(--accentfg);
 }
-main{max-width:980px;margin:18px auto;padding:0 16px 24px}
+
+main{
+  max-width:980px;
+  margin:18px auto;
+  padding:0 16px 24px;
+}
 body.reader-open main{max-width:min(1200px, 96vw)}
+
 .card{
   background:var(--card);
   border:1px solid var(--border);
@@ -191,6 +230,7 @@ body.reader-open main{max-width:min(1200px, 96vw)}
   margin-bottom:16px;
   box-shadow:var(--shadow);
 }
+
 h2{margin:0 0 8px 0;font-size:18px}
 p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
 
@@ -230,7 +270,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   font-size:14px;
 }
 
-/* books */
+/* ===== Catalogue (covers) ===== */
 .book{
   display:flex;
   justify-content:space-between;
@@ -242,29 +282,54 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   background:var(--bg);
   margin-bottom:12px;
 }
-.book-left{display:flex;align-items:center;gap:12px;min-width:0}
+.book-left{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width:0;
+}
 .book-cover{
-  height:60px;width:auto;flex:0 0 auto;display:block;
+  height:60px;
+  width:auto;
+  flex:0 0 auto;
+  display:block;
   border-radius:4px;
   border:1px solid color-mix(in srgb, var(--border) 80%, transparent);
   box-shadow:0 6px 16px rgba(0,0,0,.10);
   background:color-mix(in srgb, var(--card) 70%, var(--bg));
 }
 .book-cover-fallback{
-  height:60px;width:42px;flex:0 0 auto;
-  display:flex;align-items:center;justify-content:center;
-  border-radius:4px;border:1px dashed var(--border);
-  color:var(--muted);font-size:11px;padding:6px;text-align:center;line-height:1.1;
+  height:60px;
+  width:42px;
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:4px;
+  border:1px dashed var(--border);
+  color:var(--muted);
+  font-size:11px;
+  padding:6px;
+  text-align:center;
+  line-height:1.1;
   background:color-mix(in srgb, var(--card) 70%, var(--bg));
 }
-.book-meta{min-width:0}
+.book-meta{min-width:0;}
 .book strong{
-  display:block;font-size:16px;letter-spacing:.2px;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  display:block;
+  font-size:16px;
+  letter-spacing:.2px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
 }
 .book small{
-  color:var(--muted);display:block;margin-top:2px;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--muted);
+  display:block;
+  margin-top:2px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
 }
 .book .tags{
   margin-top:4px;
@@ -312,7 +377,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   color: var(--muted);
 }
 
-/* Reader */
+/* ===== Reader ===== */
 .reader-top{
   display:flex;
   justify-content:space-between;
@@ -320,6 +385,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   gap:10px;
   margin-bottom:10px;
 }
+
 .reader-title{
   font-size:14px;
   color:var(--muted);
@@ -328,6 +394,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   white-space:nowrap;
   max-width:70%;
 }
+
 .viewer{
   border:1px solid var(--border);
   border-radius:var(--radius);
@@ -337,7 +404,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   box-shadow: var(--ui-shadow);
 }
 
-/* toolbar */
+/* ===== TOOLBAR (desktop default) ===== */
 .viewer-toolbar{
   display:flex;
   justify-content:space-between;
@@ -351,10 +418,24 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   backdrop-filter: blur(10px) saturate(140%);
   border-bottom: 1px solid var(--ui-border);
 }
-.viewer-left,.viewer-right{display:flex;align-items:center;gap:10px;min-width:180px}
+
+.viewer-left,.viewer-right{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width: 180px;
+}
 .viewer-left{justify-content:flex-start; flex-wrap:wrap}
 .viewer-right{justify-content:flex-end; flex-wrap:wrap}
-.viewer-center{display:flex;align-items:center;gap:10px;justify-content:center;flex:1;flex-wrap:wrap}
+
+.viewer-center{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  justify-content:center;
+  flex:1;
+  flex-wrap:wrap;
+}
 
 .viewer-toolbar .btn{
   border: 1px solid var(--ui-btn-border);
@@ -367,6 +448,8 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   font-weight: 700;
   letter-spacing: .2px;
 }
+
+/* Hover/active plus nets */
 .viewer-toolbar .btn:hover{
   background: var(--ui-btn-bg-hover);
   border-color: color-mix(in srgb, var(--accent) 22%, var(--ui-btn-border));
@@ -380,6 +463,10 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   outline-offset: 2px;
 }
 
+/* Flèches / fullscreen un peu plus lisibles */
+#prevBtn, #nextBtn, #fsBtn{ font-size:16px; }
+
+/* Progress "pill" centrale plus lisible */
 .viewer-hint{
   font-weight: 800;
   color: var(--fg);
@@ -395,32 +482,26 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   max-width:min(420px, 42vw);
 }
 
-.pill{
-  font-size:12px;
-  color:var(--ui-btn-fg-muted);
-  padding:6px 10px;
-  border:1px solid var(--ui-border);
+/* Time + badge : meilleur contraste */
+.pill, .save-badge{
+  background: var(--ui-surface-strong);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-btn-fg-muted);
+  font-weight: 700;
   border-radius:999px;
-  background:var(--ui-surface-strong);
   white-space:nowrap;
-  font-weight:700;
 }
+.pill{ font-size:12px; padding:6px 10px; }
 .save-badge{
   font-size:12px;
-  color:var(--ui-btn-fg-muted);
   padding:6px 10px;
-  border:1px solid var(--ui-border);
-  border-radius:999px;
-  background:var(--ui-surface-strong);
   opacity:0;
   transform:translateY(2px);
   transition:opacity .18s ease, transform .18s ease;
-  white-space:nowrap;
-  font-weight:700;
 }
 .save-badge.show{opacity:1;transform:translateY(0)}
 
-/* progress */
+/* progress bar */
 .progress-wrap{
   display:flex;
   align-items:center;
@@ -456,7 +537,6 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
 .progress-wrap[aria-disabled="true"]{opacity:.55;pointer-events:none}
 .progress-wrap[aria-disabled="true"] .progress-label{color: color-mix(in srgb, var(--muted) 70%, transparent)}
 
-/* viewer */
 #viewer{
   width:100%;
   height: calc(100vh - 270px);
@@ -477,9 +557,12 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
 .tapzone.right{right:0}
 .tapzone:active{background:color-mix(in srgb, var(--accent) 6%, transparent)}
 
-/* fullscreen */
+/* Fullscreen */
 .fullscreen-exit{
-  position:absolute;top:10px;right:10px;z-index:50;
+  position:absolute;
+  top:10px;
+  right:10px;
+  z-index:50;
   display:none;
   padding:10px 12px;
   border:1px solid var(--border);
@@ -494,13 +577,21 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   transition:opacity .18s ease, transform .18s ease;
 }
 .fullscreen-exit.show{opacity:1;transform:translateY(0)}
+
 .viewer:fullscreen{
-  border-radius:0;border:0;width:100vw;height:100vh;background:var(--bg);
+  border-radius:0;
+  border:0;
+  width:100vw;
+  height:100vh;
+  background:var(--bg);
 }
 .viewer:fullscreen #viewer{height: calc(100vh - 106px);}
 .viewer:fullscreen .fullscreen-exit{
-  display:inline-flex;align-items:center;gap:8px;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
 }
+
 body.fs header{display:none}
 body.fs main{margin:0; padding:0}
 body.fs .card{border-radius:0; box-shadow:none; margin:0; padding:0; border:0}
@@ -608,20 +699,35 @@ body.zen.ui-visible .progress-wrap{
   background:color-mix(in srgb, var(--card) 75%, var(--bg));
 }
 
-.footer{display:flex;justify-content:center;align-items:center;padding:28px 16px 40px}
+.footer{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  padding:28px 16px 40px;
+}
 .footer-logo{max-height:150px;width:auto;display:block}
 body.reader-open .footer{display:none}
 
-/* Mobile */
+/* ===== Mobile improvements ===== */
 @media (max-width:760px){
   .btn{ padding:12px 12px; }
+
   header{ grid-template-columns: auto 1fr auto; }
   header strong{font-size:16px;}
   .tagline{font-size:12px;}
+
   .book{align-items:flex-start;}
   .book strong,.book small{white-space:normal;}
-  .viewer-toolbar{flex-wrap:wrap;gap:8px;padding:8px}
-  .viewer-left,.viewer-center,.viewer-right{
+
+  .viewer-toolbar{
+    flex-wrap:wrap;
+    gap:8px;
+    padding:8px;
+  }
+
+  .viewer-left,
+  .viewer-center,
+  .viewer-right{
     min-width:0;
     flex:1 1 100%;
     justify-content:flex-start;
@@ -632,7 +738,18 @@ body.reader-open .footer{display:none}
     gap:8px;
     padding-bottom:2px;
   }
-  .viewer-hint{font-size:12px;padding:7px 10px;max-width:92vw}
+  .viewer-left::-webkit-scrollbar,
+  .viewer-center::-webkit-scrollbar,
+  .viewer-right::-webkit-scrollbar{ display:none; }
+
+  .viewer-hint{
+    min-width:0;
+    flex:1 1 auto;
+    font-size:12px;
+    text-align:center;
+    max-width:92vw;
+  }
+
   :root{ --ui-btn-height: 40px; }
 }
 @media (max-width:420px){
@@ -646,16 +763,19 @@ body.night .btn:visited,
 body.night .btn:hover,
 body.night .btn:active,
 body.night .btn:focus{ color: var(--fg) !important; }
+
 body.night .btn-primary,
 body.night .btn-primary:visited,
 body.night .btn-primary:hover,
 body.night .btn-primary:active,
 body.night .btn-primary:focus{ color: var(--accentfg) !important; }
+
 body.night .pill,
 body.night .save-badge,
 body.night .viewer-hint,
 body.night .reader-title,
 body.night .tagline{ color: var(--muted) !important; }
+
 body.night .fullscreen-exit{ color: var(--fg) !important; }
 body.night .btn *{ color: inherit !important; }
 </style>
@@ -824,7 +944,7 @@ body.night .btn *{ color: inherit !important; }
       cover: "https://cclamazonia.noblogs.org/files/2026/01/Capa-economia-libertaria.png",
       tags: ["Economia", "socialismo libertário", "autogestão económica"],
       missing: true,
-      missingMessage: "⚠️ Este EPUB ainda não está disponível.\n\n(Arquivo ainda em produção / não publicado.)"
+      missingMessage: "⚠️ EPUB em construção.\n\n(Arquivo ainda em produção / não publicado.)"
     },
     {
       id: "economia-autogestionaria",
@@ -834,7 +954,7 @@ body.night .btn *{ color: inherit !important; }
       cover: "https://cclamazonia.noblogs.org/files/2026/01/Capa-economia-autogestionaria.png",
       tags: ["Economia", "socialismo libertário", "autogestão económica"],
       missing: true,
-      missingMessage: "⚠️ Este EPUB ainda não está disponível.\n\n(Arquivo ainda em produção / não publicado.)"
+      missingMessage: "⚠️ EPUB em construção.\n\n(Arquivo ainda em produção / não publicado.)"
     }
   ];
 
@@ -843,7 +963,6 @@ body.night .btn *{ color: inherit !important; }
   // =======================
   // SHA-256 hex of "Guillén-1913/1993" (UTF-8)
   const PRIVATE_PASSWORD_HASH_HEX = "e9b4c08b108ef2cb1bd979acab32c28d111e163431fb5856c67f8a1b2089e5ea";
-
   const ACCESS_KEY = "privateAccess";
   const ACCESS_HASH_KEY = "privateAccessHash";
 
@@ -1666,6 +1785,10 @@ table, thead, tbody, tr, td, th { background: transparent !important; }
       if (h === PRIVATE_PASSWORD_HASH_HEX) {
         setUnlocked(!!rememberChk.checked); // lembrar = persistant (localStorage)
         pwInput.value = "";
+
+        // ✅ Version 1: show everything immediately after unlock
+        if (scopeSelect) scopeSelect.value = "all";
+
         updatePrivateUI();
       } else {
         restrictedStatus.textContent = "❌ Senha incorreta";
@@ -1814,10 +1937,10 @@ table, thead, tbody, tr, td, th { background: transparent !important; }
     setProgressEnabled(false, "Progresso indisponível…");
     updateProgressBar(0);
 
-    // missing EPUBs (your two private books for now)
+    // Missing EPUBs
     if (item && item.missing) {
-      elProgress.textContent = "Indisponível";
-      showNotice(item.missingMessage || "⚠️ EPUB indisponível no momento.");
+      elProgress.textContent = "EPUB em construção";
+      showNotice(item.missingMessage || "⚠️ EPUB em construção.");
       try { document.getElementById("viewer").innerHTML = ""; } catch(e){}
       if (rendition) { try{ rendition.destroy(); } catch(e){} rendition = null; }
       book = null;
@@ -1974,6 +2097,7 @@ table, thead, tbody, tr, td, th { background: transparent !important; }
   initZen();
   syncJustifyHyphenButtons();
   updatePrivateUI();
+  renderCatalog();
 
 })();
 </script>
