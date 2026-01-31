@@ -27,6 +27,30 @@
 
   /* ===== Reader watermark (same image, very subtle) ===== */
   --reader-watermark-opacity: .10;
+
+  /* Reader prefs defaults */
+  --read-line-height: 1.65;
+  --read-pad: 18px; /* content padding inside EPUB */
+  --read-font: var(--font-reading);
+
+  /* UI surfaces */
+  --ui-surface: color-mix(in srgb, var(--card) 86%, transparent);
+  --ui-surface-strong: color-mix(in srgb, var(--card) 94%, var(--bg));
+  --ui-border: color-mix(in srgb, var(--border) 70%, transparent);
+  --ui-shadow: 0 10px 26px rgba(0,0,0,.10);
+
+  --ui-btn-bg: color-mix(in srgb, var(--bg) 72%, var(--card));
+  --ui-btn-bg-hover: color-mix(in srgb, var(--bg) 60%, var(--card));
+  --ui-btn-border: color-mix(in srgb, var(--border) 85%, transparent);
+
+  --ui-btn-fg: var(--fg);
+  --ui-btn-fg-muted: color-mix(in srgb, var(--fg) 70%, var(--muted));
+
+  --ui-btn-radius: 14px;
+  --ui-btn-height: 42px;
+
+  --progress-track: color-mix(in srgb, var(--border) 55%, transparent);
+  --progress-fill: color-mix(in srgb, var(--accent) 85%, transparent);
 }
 
 body.night{
@@ -41,9 +65,14 @@ body.night{
   --accentfg:#0f1115;
 
   --shadow:0 12px 34px rgba(0,0,0,.35);
-
-  /* Slightly different opacity at night so it's still subtle */
   --reader-watermark-opacity: .08;
+
+  --ui-shadow: 0 14px 30px rgba(0,0,0,.40);
+  --ui-btn-bg: color-mix(in srgb, var(--bg) 58%, var(--card));
+  --ui-btn-bg-hover: color-mix(in srgb, var(--bg) 45%, var(--card));
+
+  --progress-track: color-mix(in srgb, var(--border) 60%, transparent);
+  --progress-fill: color-mix(in srgb, var(--accent) 75%, transparent);
 }
 
 *{box-sizing:border-box}
@@ -60,7 +89,6 @@ body{
 }
 
 /* ===== Catalogue-only background image (does NOT change with theme) ===== */
-/* Default state = catalogue visible, reader closed */
 body:not(.reader-open){
   background-image: var(--catalog-bg-url);
   background-size: cover;
@@ -125,7 +153,6 @@ header{
   gap:12px;
 }
 
-/* Left: back-to-blog button */
 .header-left{
   display:flex;
   align-items:center;
@@ -133,7 +160,6 @@ header{
   min-width:0;
 }
 
-/* Center: title */
 .brand{
   display:flex;
   flex-direction:column;
@@ -151,7 +177,6 @@ header strong{
   color:var(--muted);
 }
 
-/* Right: theme toggle */
 .header-right{
   display:flex;
   align-items:center;
@@ -185,6 +210,12 @@ header strong{
   color:var(--accentfg);
 }
 
+.btn-ghost{
+  border:1px solid var(--ui-btn-border);
+  background:var(--ui-btn-bg);
+  color:var(--ui-btn-fg);
+}
+
 main{
   max-width:980px;
   margin:18px auto;
@@ -203,6 +234,42 @@ body.reader-open main{max-width:min(1200px, 96vw)}
 
 h2{margin:0 0 8px 0;font-size:18px}
 p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
+
+/* ===== Catalogue controls ===== */
+.catalog-controls{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
+  margin:12px 0 14px;
+}
+.input{
+  flex:1 1 240px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:10px 12px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:color-mix(in srgb, var(--bg) 88%, var(--card));
+}
+.input input{
+  width:100%;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:var(--fg);
+  font-size:14px;
+}
+.select{
+  flex:0 0 auto;
+  padding:10px 12px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:color-mix(in srgb, var(--bg) 88%, var(--card));
+  color:var(--fg);
+  font-size:14px;
+}
 
 /* ===== Catalogue (covers) ===== */
 .book{
@@ -266,16 +333,6 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   white-space:nowrap;
 }
 
-@media (max-width:560px){
-  header{
-    grid-template-columns: auto 1fr auto;
-  }
-  header strong{font-size:16px;}
-  .tagline{font-size:12px;}
-  .book{align-items:flex-start;}
-  .book strong,.book small{white-space:normal;}
-}
-
 /* ===== Reader ===== */
 .reader-top{
   display:flex;
@@ -300,9 +357,10 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   overflow:hidden;
   background:var(--bg);
   position:relative;
+  box-shadow: var(--ui-shadow);
 }
 
-/* ===== TOOLBAR (desktop default) ===== */
+/* ===== TOOLBAR ===== */
 .viewer-toolbar{
   display:flex;
   justify-content:space-between;
@@ -310,13 +368,18 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   gap:10px;
   padding:10px;
   border-bottom:1px solid var(--border);
-  background:var(--card);
+  background:var(--ui-surface);
+  backdrop-filter: blur(10px) saturate(140%);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  border-bottom: 1px solid var(--ui-border);
 }
 
 .viewer-left,.viewer-right{
   display:flex;
   align-items:center;
-  gap:8px;
+  gap:10px;
   min-width: 180px;
 }
 .viewer-left{justify-content:flex-start; flex-wrap:wrap}
@@ -331,96 +394,136 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   flex-wrap:wrap;
 }
 
+.viewer-toolbar .btn{
+  border: 1px solid var(--ui-btn-border);
+  background: var(--ui-btn-bg);
+  color: var(--ui-btn-fg);
+  height: var(--ui-btn-height);
+  padding: 0 12px;
+  border-radius: var(--ui-btn-radius);
+  box-shadow: 0 6px 16px rgba(0,0,0,.08);
+  font-weight: 700;
+  letter-spacing: .2px;
+}
+.viewer-toolbar .btn:hover{
+  background: var(--ui-btn-bg-hover);
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--ui-btn-border));
+}
+.viewer-toolbar .btn:active{
+  transform: translateY(1px) scale(.99);
+  box-shadow: 0 4px 10px rgba(0,0,0,.08);
+}
+.viewer-toolbar .btn:focus{
+  outline: 3px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  outline-offset: 2px;
+}
+
 .viewer-hint{
-  color:var(--muted);
-  font-size:13px;
-  min-width: 180px;
-  text-align:center;
+  font-weight: 800;
+  color: var(--fg);
+  background: var(--ui-surface-strong);
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  padding: 8px 12px;
+  min-width: unset;
+  box-shadow: 0 6px 16px rgba(0,0,0,.06);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  max-width:min(420px, 42vw);
 }
 
 .pill{
   font-size:12px;
-  color:var(--muted);
+  color:var(--ui-btn-fg-muted);
   padding:6px 10px;
-  border:1px solid var(--border);
+  border:1px solid var(--ui-border);
   border-radius:999px;
-  background:color-mix(in srgb, var(--bg) 70%, var(--card));
+  background:var(--ui-surface-strong);
   white-space:nowrap;
+  font-weight:700;
 }
 
 .save-badge{
   font-size:12px;
-  color:var(--muted);
+  color:var(--ui-btn-fg-muted);
   padding:6px 10px;
-  border:1px solid var(--border);
+  border:1px solid var(--ui-border);
   border-radius:999px;
-  background:color-mix(in srgb, var(--bg) 70%, var(--card));
+  background:var(--ui-surface-strong);
   opacity:0;
   transform:translateY(2px);
   transition:opacity .18s ease, transform .18s ease;
   white-space:nowrap;
+  font-weight:700;
 }
 .save-badge.show{opacity:1;transform:translateY(0)}
 
-/* ===== Mobile improvements: toolbar fully accessible ===== */
-@media (max-width:760px){
-  /* Bigger tap targets */
-  .btn{ padding:12px 12px; }
-
-  /* Toolbar becomes 2 rows and remains scrollable if needed */
-  .viewer-toolbar{
-    flex-wrap:wrap;
-    gap:8px;
-    padding:8px;
-  }
-
-  .viewer-left,
-  .viewer-center,
-  .viewer-right{
-    min-width:0;
-    flex:1 1 100%;
-    justify-content:flex-start;
-    flex-wrap:nowrap;
-    overflow-x:auto;
-    -webkit-overflow-scrolling:touch;
-    scrollbar-width:none; /* Firefox */
-    gap:8px;
-    padding-bottom:2px;
-  }
-  .viewer-left::-webkit-scrollbar,
-  .viewer-center::-webkit-scrollbar,
-  .viewer-right::-webkit-scrollbar{
-    display:none; /* Chrome/Safari */
-  }
-
-  /* Keep groups in sensible order */
-  .viewer-left{ order:1; }
-  .viewer-center{ order:2; justify-content:space-between; }
-  .viewer-right{ order:3; justify-content:flex-end; }
-
-  /* Progress text stays readable but can shrink */
-  .viewer-hint{
-    min-width:0;
-    flex:1 1 auto;
-    font-size:12px;
-    text-align:center;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-  }
+/* ===== Progress bar ===== */
+.progress-wrap{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 12px;
+  border-bottom:1px solid var(--ui-border);
+  background: color-mix(in srgb, var(--bg) 82%, var(--card));
+}
+.progress-label{
+  font-size:12px;
+  color:var(--muted);
+  white-space:nowrap;
+}
+.progress{
+  position:relative;
+  flex:1 1 auto;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--progress-track);
+  overflow:hidden;
+}
+.progress > .fill{
+  height:100%;
+  width:0%;
+  background: var(--progress-fill);
+  border-radius: 999px;
+  transition: width .12s ease;
+}
+.progress-range{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  opacity:0;
+  cursor:pointer;
+}
+.progress-wrap[aria-disabled="true"]{
+  opacity:.55;
+  pointer-events:none;
+}
+.progress-wrap[aria-disabled="true"] .progress-label{
+  color: color-mix(in srgb, var(--muted) 70%, transparent);
 }
 
-/* Extra-small phones: hide non-essential badges to keep buttons visible */
-@media (max-width:420px){
-  #saveBadge{ display:none; }
-  #timePill{ display:none; }
-}
-
+/* Reader area */
 #viewer{
   width:100%;
-  height: calc(100vh - 230px);
-  background:var(--bg);
+  height: calc(100vh - 270px);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  position:relative;
 }
+
+/* Tap zones */
+.tapzone{
+  position:absolute;
+  top:0;
+  bottom:0;
+  width:28%;
+  z-index:4;
+  background:transparent;
+}
+.tapzone.left{left:0}
+.tapzone.right{right:0}
+.tapzone:active{background:color-mix(in srgb, var(--accent) 6%, transparent)}
 
 /* Fullscreen */
 .fullscreen-exit{
@@ -450,7 +553,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   height:100vh;
   background:var(--bg);
 }
-.viewer:fullscreen #viewer{height: calc(100vh - 64px);}
+.viewer:fullscreen #viewer{height: calc(100vh - 106px);}
 .viewer:fullscreen .fullscreen-exit{
   display:inline-flex;
   align-items:center;
@@ -462,6 +565,150 @@ body.fs main{margin:0; padding:0}
 body.fs .card{border-radius:0; box-shadow:none; margin:0; padding:0; border:0}
 body.fs .reader-top{display:none}
 
+/* Zen mode (UI auto-hide) */
+body.zen header{opacity:0; pointer-events:none; transition:opacity .22s ease;}
+body.zen .reader-top{opacity:0; pointer-events:none; transition:opacity .22s ease;}
+body.zen .viewer-toolbar{opacity:0; pointer-events:none; transition:opacity .22s ease;}
+body.zen .progress-wrap{opacity:0; pointer-events:none; transition:opacity .22s ease;}
+body.zen .fullscreen-exit{opacity:0.9; pointer-events:auto;} /* keep exit */
+
+body.zen.ui-visible header,
+body.zen.ui-visible .reader-top,
+body.zen.ui-visible .viewer-toolbar,
+body.zen.ui-visible .progress-wrap{
+  opacity:1;
+  pointer-events:auto;
+}
+
+/* Drawer (TOC + Settings) */
+.drawer-backdrop{
+  position:fixed;
+  inset:0;
+  background: rgba(0,0,0,.45);
+  display:none;
+  z-index:100;
+}
+.drawer{
+  position:fixed;
+  top:0; right:0;
+  height:100%;
+  width:min(420px, 92vw);
+  background: color-mix(in srgb, var(--bg) 92%, var(--card));
+  border-left:1px solid var(--ui-border);
+  box-shadow: 0 18px 50px rgba(0,0,0,.28);
+  transform: translateX(102%);
+  transition: transform .18s ease;
+  z-index:101;
+  display:flex;
+  flex-direction:column;
+}
+.drawer.open{transform: translateX(0);}
+.drawer-backdrop.open{display:block;}
+
+.drawer-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:14px 14px 10px;
+  border-bottom:1px solid var(--ui-border);
+}
+.drawer-title{
+  font-weight:800;
+  letter-spacing:.2px;
+}
+.drawer-body{
+  padding:12px 14px 16px;
+  overflow:auto;
+}
+.drawer-section{
+  padding:10px 0 14px;
+  border-bottom:1px dashed var(--ui-border);
+}
+.drawer-section:last-child{border-bottom:0}
+.drawer small{color:var(--muted)}
+.drawer a, .drawer button, .drawer input, .drawer select{font-family:var(--font-ui);}
+
+.toc-list{
+  list-style:none;
+  padding:0;
+  margin:10px 0 0;
+}
+.toc-item{
+  display:flex;
+  gap:8px;
+  align-items:flex-start;
+  padding:10px 10px;
+  border:1px solid transparent;
+  border-radius:12px;
+  cursor:pointer;
+  user-select:none;
+}
+.toc-item:hover{
+  background: color-mix(in srgb, var(--card) 55%, var(--bg));
+  border-color: var(--ui-border);
+}
+.toc-indent{width:12px; flex:0 0 auto; opacity:.55}
+.toc-text{
+  flex:1 1 auto;
+  min-width:0;
+  color:var(--fg);
+}
+.toc-text .t{
+  display:block;
+  font-weight:700;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.toc-text .s{
+  display:block;
+  font-size:12px;
+  color:var(--muted);
+  margin-top:2px;
+}
+
+.pref-grid{
+  display:grid;
+  grid-template-columns: 1fr;
+  gap:10px;
+  margin-top:10px;
+}
+.pref-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 10px;
+  border:1px solid var(--ui-border);
+  border-radius:12px;
+  background: var(--ui-surface-strong);
+}
+.pref-row label{
+  font-weight:700;
+  color:var(--fg);
+}
+.pref-row .hint{
+  font-size:12px;
+  color:var(--muted);
+  margin-top:2px;
+  font-weight:600;
+}
+.pref-row .right{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+.pref-row select{
+  padding:8px 10px;
+  border-radius:10px;
+  border:1px solid var(--ui-border);
+  background: color-mix(in srgb, var(--bg) 75%, var(--card));
+  color:var(--fg);
+  font-weight:700;
+}
+
+/* Notice */
 .notice{
   margin-top:10px;
   padding:10px;
@@ -471,6 +718,7 @@ body.fs .reader-top{display:none}
   background:color-mix(in srgb, var(--card) 75%, var(--bg));
 }
 
+/* Footer */
 .footer{
   display:flex;
   justify-content:center;
@@ -480,178 +728,80 @@ body.fs .reader-top{display:none}
 .footer-logo{max-height:150px;width:auto;display:block}
 body.reader-open .footer{display:none}
 
-/* =========================================================
-   Reader UI — enhanced visibility (PC + mobile, day/night)
-   (Override only, no JS/HTML changes)
-   ========================================================= */
+/* Mobile */
+@media (max-width:760px){
+  .btn{ padding:12px 12px; }
 
-:root{
-  --ui-surface: color-mix(in srgb, var(--card) 86%, transparent);
-  --ui-surface-strong: color-mix(in srgb, var(--card) 94%, var(--bg));
-  --ui-border: color-mix(in srgb, var(--border) 70%, transparent);
-  --ui-shadow: 0 10px 26px rgba(0,0,0,.10);
+  header{ grid-template-columns: auto 1fr auto; }
+  header strong{font-size:16px;}
+  .tagline{font-size:12px;}
 
-  --ui-btn-bg: color-mix(in srgb, var(--bg) 72%, var(--card));
-  --ui-btn-bg-hover: color-mix(in srgb, var(--bg) 60%, var(--card));
-  --ui-btn-border: color-mix(in srgb, var(--border) 85%, transparent);
-
-  --ui-btn-fg: var(--fg);
-  --ui-btn-fg-muted: color-mix(in srgb, var(--fg) 70%, var(--muted));
-
-  --ui-btn-radius: 14px;
-  --ui-btn-height: 42px;
-}
-
-body.night{
-  --ui-shadow: 0 14px 30px rgba(0,0,0,.40);
-  --ui-btn-bg: color-mix(in srgb, var(--bg) 58%, var(--card));
-  --ui-btn-bg-hover: color-mix(in srgb, var(--bg) 45%, var(--card));
-}
-
-/* Un peu plus de présence pour le viewer */
-.viewer{
-  box-shadow: var(--ui-shadow);
-}
-
-/* Toolbar sticky pour rester accessible pendant lecture */
-.viewer-toolbar{
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  background: var(--ui-surface);
-  backdrop-filter: blur(10px) saturate(140%);
-  border-bottom: 1px solid var(--ui-border);
-}
-
-/* Boutons de la toolbar : plus visibles (sans impacter le reste du site) */
-.viewer-toolbar .btn{
-  border: 1px solid var(--ui-btn-border);
-  background: var(--ui-btn-bg);
-  color: var(--ui-btn-fg);
-  height: var(--ui-btn-height);
-  padding: 0 12px;
-  border-radius: var(--ui-btn-radius);
-  box-shadow: 0 6px 16px rgba(0,0,0,.08);
-  font-weight: 700;
-  letter-spacing: .2px;
-}
-
-/* Hover/active plus nets */
-.viewer-toolbar .btn:hover{
-  background: var(--ui-btn-bg-hover);
-  border-color: color-mix(in srgb, var(--accent) 22%, var(--ui-btn-border));
-}
-.viewer-toolbar .btn:active{
-  transform: translateY(1px) scale(.99);
-  box-shadow: 0 4px 10px rgba(0,0,0,.08);
-}
-
-/* Flèches / fullscreen un peu plus lisibles */
-#prevBtn, #nextBtn, #fsBtn{
-  font-size:16px;
-}
-
-/* Progress "pill" centrale plus lisible */
-.viewer-hint{
-  font-weight: 800;
-  color: var(--fg);
-  background: var(--ui-surface-strong);
-  border: 1px solid var(--ui-border);
-  border-radius: 999px;
-  padding: 8px 12px;
-  min-width: unset;
-  box-shadow: 0 6px 16px rgba(0,0,0,.06);
-}
-
-/* Time + badge : meilleur contraste */
-.pill, .save-badge{
-  background: var(--ui-surface-strong);
-  border: 1px solid var(--ui-border);
-  color: var(--ui-btn-fg-muted);
-  font-weight: 700;
-}
-
-/* Spacing un poil plus confortable */
-.viewer-left, .viewer-center, .viewer-right{
-  gap: 10px;
-}
-
-/* Zone lecture : fond légèrement adouci */
-#viewer{
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
-}
-
-/* Mobile : un chouïa plus compact sans perdre la lisibilité */
-@media (max-width:560px){
-  :root{ --ui-btn-height: 40px; }
+  .book{align-items:flex-start;}
+  .book strong,.book small{white-space:normal;}
 
   .viewer-toolbar{
+    flex-wrap:wrap;
     gap:8px;
-    padding:10px 10px;
+    padding:8px;
   }
 
-  .viewer-left, .viewer-right{
-    min-width: unset;
+  .viewer-left,
+  .viewer-center,
+  .viewer-right{
+    min-width:0;
+    flex:1 1 100%;
+    justify-content:flex-start;
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    gap:8px;
+    padding-bottom:2px;
   }
+  .viewer-left::-webkit-scrollbar,
+  .viewer-center::-webkit-scrollbar,
+  .viewer-right::-webkit-scrollbar{display:none;}
+
+  .viewer-left{ order:1; }
+  .viewer-center{ order:2; justify-content:space-between; }
+  .viewer-right{ order:3; justify-content:flex-end; }
 
   .viewer-hint{
     font-size:12px;
     padding:7px 10px;
+    max-width: 92vw;
   }
 
-  #restartBtn{
-    padding: 0 10px;
-    font-weight: 800;
-  }
-
-  .pill{
-    font-size:11px;
-    padding:6px 8px;
-  }
+  :root{ --ui-btn-height: 40px; }
 }
 
-/* Focus accessibilité : très visible */
-.viewer-toolbar .btn:focus{
-  outline: 3px solid color-mix(in srgb, var(--accent) 38%, transparent);
-  outline-offset: 2px;
+@media (max-width:420px){
+  #saveBadge{ display:none; }
+  #timePill{ display:none; }
 }
 
-/* =========================================================
-   FIX: text colors in night mode (force UI readability)
-   (buttons/links can fall back to black in some browsers)
-   ========================================================= */
+/* Fix: text colors in night mode */
 body.night .btn,
 body.night .btn:visited,
 body.night .btn:hover,
 body.night .btn:active,
-body.night .btn:focus{
-  color: var(--fg) !important;
-}
+body.night .btn:focus{ color: var(--fg) !important; }
 
 body.night .btn-primary,
 body.night .btn-primary:visited,
 body.night .btn-primary:hover,
 body.night .btn-primary:active,
-body.night .btn-primary:focus{
-  color: var(--accentfg) !important;
-}
+body.night .btn-primary:focus{ color: var(--accentfg) !important; }
 
 body.night .pill,
 body.night .save-badge,
 body.night .viewer-hint,
 body.night .reader-title,
-body.night .tagline{
-  color: var(--muted) !important;
-}
+body.night .tagline{ color: var(--muted) !important; }
 
-body.night .fullscreen-exit{
-  color: var(--fg) !important;
-}
+body.night .fullscreen-exit{ color: var(--fg) !important; }
 
-/* Ensure nested elements (icons/spans) keep the right color */
-body.night .btn *{
-  color: inherit !important;
-}
+body.night .btn *{ color: inherit !important; }
 </style>
 </head>
 
@@ -680,6 +830,21 @@ body.night .btn *{
   <section id="catalogo" class="card">
     <h2>Catálogo</h2>
     <p>Escolha um livro para abrir no leitor.</p>
+
+    <div class="catalog-controls" aria-label="Ferramentas do catálogo">
+      <div class="input" role="search">
+        <span aria-hidden="true">🔎</span>
+        <input id="searchInput" type="search" placeholder="Pesquisar por título ou autor…" aria-label="Pesquisar no catálogo">
+      </div>
+
+      <select id="sortSelect" class="select" aria-label="Ordenar catálogo">
+        <option value="title">Ordenar: título</option>
+        <option value="author">Ordenar: autor</option>
+      </select>
+
+      <button class="btn" id="clearSearchBtn" type="button" title="Limpar pesquisa" aria-label="Limpar pesquisa">Limpar</button>
+    </div>
+
     <div id="books"></div>
   </section>
 
@@ -690,10 +855,13 @@ body.night .btn *{
     </div>
 
     <div class="viewer" id="viewerShell">
-      <div class="viewer-toolbar">
+      <div class="viewer-toolbar" aria-label="Barra de ferramentas do leitor">
         <div class="viewer-left">
           <button class="btn" id="prevBtn" type="button" aria-label="Página anterior" title="Página anterior">←</button>
           <button class="btn" id="restartBtn" type="button" aria-label="Recomeçar do início" title="Recomeçar do início">Recomeçar</button>
+          <button class="btn" id="tocBtn" type="button" aria-label="Sommaire" title="Sommaire">☰</button>
+          <button class="btn" id="prefsBtn" type="button" aria-label="Configurações de leitura" title="Configurações">⚙</button>
+          <button class="btn" id="zenBtn" type="button" aria-label="Modo Zen" title="Modo Zen">🕶</button>
           <button class="btn" id="fsBtn" type="button" aria-label="Tela cheia" title="Tela cheia">⛶</button>
         </div>
 
@@ -708,10 +876,23 @@ body.night .btn *{
           <button class="btn" id="hyphenBtn" type="button" aria-label="Hifenização" title="Alternar hifenização">Hy</button>
 
           <span class="pill" id="timePill" aria-label="Tempo de leitura">Tempo: 00:00</span>
-          <span class="save-badge" id="saveBadge" aria-live="polite">Última leitura salva ✅</span>
+          <span class="save-badge" id="saveBadge" aria-live="polite">Salvo ✅</span>
+
           <button class="btn" id="nextBtn" type="button" aria-label="Próxima página" title="Próxima página">→</button>
         </div>
       </div>
+
+      <div class="progress-wrap" id="progressWrap" aria-disabled="true" aria-label="Barra de progresso">
+        <span class="progress-label" id="progressStatus">Progresso indisponível…</span>
+        <div class="progress" aria-hidden="true">
+          <div class="fill" id="progressFill"></div>
+          <input class="progress-range" id="progressRange" type="range" min="0" max="1000" value="0" step="1" aria-label="Ir para posição do livro">
+        </div>
+      </div>
+
+      <!-- Tap zones for mobile / mouse -->
+      <div class="tapzone left" id="tapLeft" aria-label="Página anterior" title="Página anterior"></div>
+      <div class="tapzone right" id="tapRight" aria-label="Próxima página" title="Próxima página"></div>
 
       <button class="fullscreen-exit" id="fsExitBtn" type="button" aria-label="Sair da tela cheia" title="Sair da tela cheia">⤫ Sair</button>
       <div id="viewer" aria-label="Área de leitura"></div>
@@ -724,6 +905,16 @@ body.night .btn *{
 <footer class="footer" aria-label="Editora CCLA">
   <img class="footer-logo" src="assets/logo/ccla_editora.png" alt="Editora CCLA">
 </footer>
+
+<!-- Drawer backdrop + panel -->
+<div class="drawer-backdrop" id="drawerBackdrop" aria-hidden="true"></div>
+<aside class="drawer" id="drawer" aria-label="Painel lateral" aria-hidden="true">
+  <div class="drawer-head">
+    <div class="drawer-title" id="drawerTitle">Sommaire</div>
+    <button class="btn" id="drawerCloseBtn" type="button" aria-label="Fechar painel" title="Fechar">⤫</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</aside>
 
 <script src="jszip.min.js"></script>
 <script src="epub.min.js"></script>
@@ -757,10 +948,33 @@ body.night .btn *{
   const btnJustify   = document.getElementById("justifyBtn");
   const btnHyphen    = document.getElementById("hyphenBtn");
 
-  // Fullscreen
+  const btnToc = document.getElementById("tocBtn");
+  const btnPrefs = document.getElementById("prefsBtn");
+  const btnZen = document.getElementById("zenBtn");
+
   const viewerShell = document.getElementById("viewerShell");
   const btnFs = document.getElementById("fsBtn");
   const btnFsExit = document.getElementById("fsExitBtn");
+
+  const tapLeft = document.getElementById("tapLeft");
+  const tapRight = document.getElementById("tapRight");
+
+  const progressWrap = document.getElementById("progressWrap");
+  const progressStatus = document.getElementById("progressStatus");
+  const progressFill = document.getElementById("progressFill");
+  const progressRange = document.getElementById("progressRange");
+
+  // Catalogue controls
+  const searchInput = document.getElementById("searchInput");
+  const sortSelect = document.getElementById("sortSelect");
+  const clearSearchBtn = document.getElementById("clearSearchBtn");
+
+  // Drawer
+  const drawerBackdrop = document.getElementById("drawerBackdrop");
+  const drawer = document.getElementById("drawer");
+  const drawerTitle = document.getElementById("drawerTitle");
+  const drawerBody = document.getElementById("drawerBody");
+  const drawerCloseBtn = document.getElementById("drawerCloseBtn");
 
   // ====== STATE ======
   let book = null;
@@ -768,11 +982,14 @@ body.night .btn *{
   let currentItem = null;
 
   let fontPct = Number(localStorage.getItem("fontPct") || 110);
-  let saveBadgeTimer = null;
-  let locReadyPromise = Promise.resolve(false);
 
   let justifyOn = (localStorage.getItem("justifyOn") || "0") === "1";
   let hyphenOn  = (localStorage.getItem("hyphenOn")  || "1") === "1";
+
+  // New prefs
+  let lineHeight = localStorage.getItem("lineHeight") || "1.65"; // string
+  let marginMode = localStorage.getItem("marginMode") || "normal"; // compact/normal/large
+  let fontMode   = localStorage.getItem("fontMode")   || "serif";  // serif/sans
 
   // Mode fixé : pages (horizontal) uniquement
   const FLOW_MODE = "paginated";
@@ -780,6 +997,23 @@ body.night .btn *{
   // Hooks (par rendition)
   let langHookInstalled = false;
   let hardCssHookInstalled = false;
+
+  // Locations ready
+  let locReadyPromise = Promise.resolve(false);
+  let locationsReady = false;
+  let lastKnownPercent = 0; // 0..1
+
+  // Save badge debounce
+  let saveBadgeTimer = null;
+  let lastSaveBadgeAt = 0;
+
+  // Drawer mode: "toc" | "prefs"
+  let drawerMode = "toc";
+
+  // Zen
+  let zenOn = (localStorage.getItem("zenOn") || "0") === "1";
+  let uiVisible = true;
+  let uiHideTimer = null;
 
   // ====== TIMER ======
   let readingSeconds = 0;
@@ -822,11 +1056,25 @@ body.night .btn *{
     document.body.classList.remove("reader-open");
   }
 
-  function showSavedBadge() {
+  function showSavedBadgeDebounced() {
     if (!elSaveBadge) return;
+    const now = Date.now();
+    if (now - lastSaveBadgeAt < 10000) return; // show at most every 10s
+    lastSaveBadgeAt = now;
+
     elSaveBadge.classList.add("show");
     if (saveBadgeTimer) clearTimeout(saveBadgeTimer);
-    saveBadgeTimer = setTimeout(() => elSaveBadge.classList.remove("show"), 1400);
+    saveBadgeTimer = setTimeout(() => elSaveBadge.classList.remove("show"), 1200);
+  }
+
+  function setCssPrefVars(){
+    // margins
+    const pad = (marginMode === "compact") ? 12 : (marginMode === "large" ? 26 : 18);
+    document.documentElement.style.setProperty("--read-line-height", String(lineHeight));
+    document.documentElement.style.setProperty("--read-pad", pad + "px");
+
+    const readFont = (fontMode === "sans") ? "var(--font-ui)" : "var(--font-reading)";
+    document.documentElement.style.setProperty("--read-font", readFont);
   }
 
   // ====== STORAGE KEYS ======
@@ -840,7 +1088,7 @@ body.night .btn *{
       const cfi = location && location.start && location.start.cfi;
       if (!cfi) return;
       localStorage.setItem(storageKeyForBook(item), cfi);
-      showSavedBadge();
+      showSavedBadgeDebounced();
     } catch(e) {}
   }
   function loadPosition(item) {
@@ -864,6 +1112,9 @@ body.night .btn *{
         book.locations.load(saved);
         if (book.locations.length() > 0) return true;
       }
+
+      // This can be slow on large books; keep user informed
+      setProgressEnabled(false, "Gerando índice de progresso…");
 
       await book.locations.generate(1024);
 
@@ -898,6 +1149,31 @@ body.night .btn *{
       }
     }
     return null;
+  }
+
+  // ===== Progress UI =====
+  function setProgressEnabled(enabled, statusText){
+    progressWrap.setAttribute("aria-disabled", enabled ? "false" : "true");
+    progressStatus.textContent = statusText || (enabled ? "Progresso" : "Progresso indisponível…");
+  }
+
+  function updateProgressBar(percent01){
+    const p = Math.max(0, Math.min(1, Number(percent01) || 0));
+    lastKnownPercent = p;
+    progressFill.style.width = (p * 100).toFixed(2) + "%";
+    progressRange.value = String(Math.round(p * 1000));
+  }
+
+  async function jumpToPercent(percent01){
+    if (!rendition || !book || !book.locations || !locationsReady) return;
+    const p = Math.max(0, Math.min(1, Number(percent01) || 0));
+    // ePub.js usually exposes cfiFromPercentage
+    if (typeof book.locations.cfiFromPercentage === "function") {
+      const cfi = book.locations.cfiFromPercentage(p);
+      if (cfi) {
+        try { await rendition.display(cfi); } catch(e) {}
+      }
+    }
   }
 
   // ====== TIMER (rAF) ======
@@ -1004,10 +1280,17 @@ body.night .btn *{
     const align = justifyOn ? "justify" : "start";
     const hy = hyphenOn ? "auto" : "manual";
 
+    const lh = String(lineHeight || "1.65");
+    const pad = (marginMode === "compact") ? 12 : (marginMode === "large" ? 26 : 18);
+    const fontFamily = (fontMode === "sans")
+      ? "system-ui,-apple-system,\"Segoe UI\",Roboto,Arial,sans-serif"
+      : "ui-serif,\"Georgia\",\"Times New Roman\",Times,serif";
+
     return `
 html, body {
   background: ${bg} !important;
   color: ${fg} !important;
+  font-family: ${fontFamily} !important;
 }
 
 * {
@@ -1023,11 +1306,11 @@ p, li, blockquote, div, section, article {
   hyphens: ${hy} !important;
   -webkit-hyphens: ${hy} !important;
   -ms-hyphens: ${hy} !important;
-  line-height: 1.65 !important;
+  line-height: ${lh} !important;
 }
 
 body {
-  padding: 18px 18px 24px 18px !important;
+  padding: ${pad}px ${pad}px ${Math.round(pad*1.35)}px ${pad}px !important;
   margin: 0 !important;
 }
 
@@ -1041,7 +1324,7 @@ table, thead, tbody, tr, td, th {
 `.trim();
   }
 
-  function upsertHardStyle(contents, night){
+  function upsertHardStyle(contents){
     try{
       const doc = contents && contents.document;
       if (!doc) return;
@@ -1053,16 +1336,16 @@ table, thead, tbody, tr, td, th {
         styleEl.type = "text/css";
         (doc.head || doc.documentElement).appendChild(styleEl);
       }
+      const night = document.body.classList.contains("night");
       styleEl.textContent = hardCssText(night);
     } catch(e){}
   }
 
   function updateAllContentsHardStyle(){
     if (!rendition) return;
-    const night = document.body.classList.contains("night");
     try{
       const list = (typeof rendition.getContents === "function") ? rendition.getContents() : [];
-      for (const c of list) upsertHardStyle(c, night);
+      for (const c of list) upsertHardStyle(c);
     } catch(e){}
   }
 
@@ -1087,8 +1370,7 @@ table, thead, tbody, tr, td, th {
       hardCssHookInstalled = true;
       try {
         rendition.hooks.content.register((contents) => {
-          const night = document.body.classList.contains("night");
-          upsertHardStyle(contents, night);
+          upsertHardStyle(contents);
         });
       } catch(e){}
     }
@@ -1112,6 +1394,9 @@ table, thead, tbody, tr, td, th {
 
     try { localStorage.setItem("justifyOn", justifyOn ? "1" : "0"); } catch(e) {}
     try { localStorage.setItem("hyphenOn",  hyphenOn  ? "1" : "0"); } catch(e) {}
+    try { localStorage.setItem("lineHeight", String(lineHeight)); } catch(e) {}
+    try { localStorage.setItem("marginMode", String(marginMode)); } catch(e) {}
+    try { localStorage.setItem("fontMode",   String(fontMode)); } catch(e) {}
   }
 
   function setTheme(isNight) {
@@ -1168,6 +1453,88 @@ table, thead, tbody, tr, td, th {
     }, {passive:true});
   });
 
+  // ===== Zen =====
+  function setZen(on){
+    zenOn = !!on;
+    document.body.classList.toggle("zen", zenOn);
+    localStorage.setItem("zenOn", zenOn ? "1" : "0");
+    btnZen.textContent = zenOn ? "🕶✓" : "🕶";
+    btnZen.setAttribute("aria-label", zenOn ? "Desativar modo Zen" : "Ativar modo Zen");
+    // when enabling zen, keep UI visible briefly then hide
+    if (zenOn) {
+      showUI();
+      scheduleHideUI();
+    } else {
+      showUI(true);
+    }
+  }
+
+  function showUI(forceOn){
+    if (!zenOn) return;
+    uiVisible = true;
+    document.body.classList.add("ui-visible");
+    clearTimeout(uiHideTimer);
+    if (forceOn) return;
+    scheduleHideUI();
+  }
+
+  function scheduleHideUI(){
+    if (!zenOn) return;
+    clearTimeout(uiHideTimer);
+    uiHideTimer = setTimeout(() => {
+      uiVisible = false;
+      document.body.classList.remove("ui-visible");
+    }, 2500);
+  }
+
+  function initZen(){
+    if (zenOn) document.body.classList.add("zen");
+    setZen(zenOn);
+    btnZen.addEventListener("click", () => setZen(!zenOn));
+
+    // Any activity shows UI in Zen
+    ["mousemove","touchstart","keydown","click","wheel"].forEach(evt => {
+      document.addEventListener(evt, () => {
+        if (zenOn) showUI();
+      }, {passive:true});
+    });
+  }
+
+  // ===== Drawer helpers =====
+  function openDrawer(mode){
+    drawerMode = mode || "toc";
+    drawerTitle.textContent = (drawerMode === "prefs") ? "Configurações" : "Sommaire";
+    drawerBody.innerHTML = "";
+    drawerBackdrop.classList.add("open");
+    drawer.classList.add("open");
+    drawer.setAttribute("aria-hidden","false");
+    drawerBackdrop.setAttribute("aria-hidden","false");
+    // Fill
+    if (drawerMode === "toc") renderTOCIntoDrawer();
+    else renderPrefsIntoDrawer();
+    // focus close
+    setTimeout(() => drawerCloseBtn && drawerCloseBtn.focus(), 0);
+  }
+
+  function closeDrawer(){
+    drawerBackdrop.classList.remove("open");
+    drawer.classList.remove("open");
+    drawer.setAttribute("aria-hidden","true");
+    drawerBackdrop.setAttribute("aria-hidden","true");
+  }
+
+  drawerBackdrop.addEventListener("click", closeDrawer);
+  drawerCloseBtn.addEventListener("click", closeDrawer);
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      if (drawer.classList.contains("open")) {
+        e.preventDefault();
+        closeDrawer();
+      }
+    }
+  });
+
   // ====== UI ======
   function coverHtml(b){
     if (!b.cover) {
@@ -1184,20 +1551,41 @@ table, thead, tbody, tr, td, th {
     `;
   }
 
+  function normalize(str){
+    return String(str || "")
+      .toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+
   function renderCatalog() {
     if (!elBooks) return;
 
-    if (!Array.isArray(BOOKS) || BOOKS.length === 0) {
-      elBooks.innerHTML = `
-        <div class="notice">
-          Nenhum livro configurado.<br>
-          Adicione arquivos <code>.epub</code> em <code>epubs/</code> e atualize a lista no código.
-        </div>
-      `;
+    const q = normalize(searchInput ? searchInput.value : "");
+    const sortMode = (sortSelect && sortSelect.value) || "title";
+
+    let list = Array.isArray(BOOKS) ? BOOKS.slice() : [];
+
+    // filter
+    if (q) {
+      list = list.filter(b => {
+        const hay = normalize((b.title || "") + " " + (b.author || ""));
+        return hay.includes(q);
+      });
+    }
+
+    // sort
+    list.sort((a,b) => {
+      const aa = normalize((sortMode === "author" ? (a.author || "") : (a.title || "")));
+      const bb = normalize((sortMode === "author" ? (b.author || "") : (b.title || "")));
+      return aa.localeCompare(bb, "pt-BR");
+    });
+
+    if (!list.length) {
+      elBooks.innerHTML = `<div class="notice">Nenhum resultado para a pesquisa.</div>`;
       return;
     }
 
-    elBooks.innerHTML = BOOKS.map(b => `
+    elBooks.innerHTML = list.map(b => `
       <div class="book">
         <div class="book-left">
           ${coverHtml(b)}
@@ -1219,28 +1607,24 @@ table, thead, tbody, tr, td, th {
     });
   }
 
+  if (searchInput) {
+    searchInput.addEventListener("input", renderCatalog);
+  }
+  if (sortSelect) {
+    sortSelect.addEventListener("change", renderCatalog);
+  }
+  if (clearSearchBtn) {
+    clearSearchBtn.addEventListener("click", () => {
+      if (searchInput) searchInput.value = "";
+      renderCatalog();
+      searchInput && searchInput.focus();
+    });
+  }
+
   function updateProgressUI(location){
     const displayed = location && location.start && location.start.displayed;
 
-    const percent = (function(){
-      const p = location && location.start && location.start.percentage;
-      if (typeof p === "number" && isFinite(p)) {
-        const pp = Math.max(0, Math.min(1, p));
-        if (!(displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99)) return pp;
-      }
-      const cfi = location && location.start && location.start.cfi;
-      if (!cfi || !book || !book.locations || typeof book.locations.length !== "function") return null;
-      if (book.locations.length() === 0) return null;
-      if (typeof book.locations.percentageFromCfi === "function") {
-        const px = book.locations.percentageFromCfi(cfi);
-        if (typeof px === "number" && isFinite(px)) {
-          const pp = Math.max(0, Math.min(1, px));
-          if (displayed && displayed.page && displayed.total && displayed.page < displayed.total && pp > 0.99) return null;
-          return pp;
-        }
-      }
-      return null;
-    })();
+    const percent = percentFromLocation(location);
 
     const pagePart = (displayed && displayed.page && displayed.total)
       ? `Página ${displayed.page} / ${displayed.total}`
@@ -1251,6 +1635,9 @@ table, thead, tbody, tr, td, th {
       : "";
 
     elProgress.textContent = pagePart + pctPart;
+
+    // progress bar
+    if (percent !== null) updateProgressBar(percent);
   }
 
   // ====== REPRISE (TOC / SPINE) ======
@@ -1298,6 +1685,203 @@ table, thead, tbody, tr, td, th {
     try { rendition.resize(); } catch(e){}
   }
 
+  // ===== TOC =====
+  function flattenToc(list, level, out){
+    level = level || 0;
+    out = out || [];
+    if (!Array.isArray(list)) return out;
+    for (const item of list) {
+      if (!item) continue;
+      out.push({
+        label: item.label || item.title || "—",
+        href: item.href || "",
+        level
+      });
+      if (Array.isArray(item.subitems) && item.subitems.length) {
+        flattenToc(item.subitems, level + 1, out);
+      }
+    }
+    return out;
+  }
+
+  function renderTOCIntoDrawer(){
+    if (!drawerBody) return;
+
+    const toc = book && book.navigation && Array.isArray(book.navigation.toc) ? book.navigation.toc : [];
+    const flat = flattenToc(toc, 0, []);
+
+    if (!flat.length) {
+      drawerBody.innerHTML = `<div class="notice">Este EPUB não possui sommaire (TOC).</div>`;
+      return;
+    }
+
+    drawerBody.innerHTML = `
+      <div class="drawer-section">
+        <small>Navegue por capítulos/partes.</small>
+        <ul class="toc-list">
+          ${flat.map((t) => `
+            <li class="toc-item" data-href="${escapeHtml(t.href)}" title="${escapeHtml(t.label)}">
+              <span class="toc-indent" aria-hidden="true">${"&nbsp;".repeat(Math.min(4, t.level) * 2)}</span>
+              <span class="toc-text">
+                <span class="t">${escapeHtml(t.label)}</span>
+                <span class="s">${t.href ? "Abrir seção" : "—"}</span>
+              </span>
+            </li>
+          `).join("")}
+        </ul>
+      </div>
+      <div class="drawer-section">
+        <button class="btn" id="tocCloseBtn" type="button">Fechar</button>
+      </div>
+    `;
+
+    const closeBtn = document.getElementById("tocCloseBtn");
+    closeBtn && closeBtn.addEventListener("click", closeDrawer);
+
+    drawerBody.querySelectorAll(".toc-item[data-href]").forEach(li => {
+      li.addEventListener("click", async () => {
+        const href = li.getAttribute("data-href");
+        if (!href || !rendition) return;
+        closeDrawer();
+        try { await rendition.display(href); } catch(e) {}
+        applyThemeToRendition();
+        await applyFlowPaginated(true);
+      });
+    });
+  }
+
+  // ===== Preferences drawer =====
+  function renderPrefsIntoDrawer(){
+    if (!drawerBody) return;
+
+    drawerBody.innerHTML = `
+      <div class="drawer-section">
+        <small>Preferências de leitura (salvas no seu navegador).</small>
+        <div class="pref-grid">
+          <div class="pref-row">
+            <div>
+              <label for="lhSel">Interlinha</label>
+              <div class="hint">Conforto de leitura</div>
+            </div>
+            <div class="right">
+              <select id="lhSel" aria-label="Interlinha">
+                <option value="1.45">1.45</option>
+                <option value="1.60">1.60</option>
+                <option value="1.65">1.65</option>
+                <option value="1.75">1.75</option>
+                <option value="1.90">1.90</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="pref-row">
+            <div>
+              <label for="mgSel">Margens</label>
+              <div class="hint">Espaçamento lateral</div>
+            </div>
+            <div class="right">
+              <select id="mgSel" aria-label="Margens">
+                <option value="compact">Compactas</option>
+                <option value="normal">Normais</option>
+                <option value="large">Largas</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="pref-row">
+            <div>
+              <label for="ffSel">Fonte</label>
+              <div class="hint">Serif ou sem serifas</div>
+            </div>
+            <div class="right">
+              <select id="ffSel" aria-label="Fonte">
+                <option value="serif">Serif</option>
+                <option value="sans">Sans</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="pref-row">
+            <div>
+              <label>Atalhos</label>
+              <div class="hint">Espaço = próxima • Shift+Espaço = anterior</div>
+            </div>
+            <div class="right">
+              <span class="pill" aria-hidden="true">⌨</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="drawer-section">
+        <button class="btn" id="resetPrefsBtn" type="button">Restaurar padrão</button>
+        <button class="btn btn-primary" id="prefsCloseBtn" type="button">Fechar</button>
+      </div>
+    `;
+
+    const lhSel = document.getElementById("lhSel");
+    const mgSel = document.getElementById("mgSel");
+    const ffSel = document.getElementById("ffSel");
+    const resetBtn = document.getElementById("resetPrefsBtn");
+    const closeBtn = document.getElementById("prefsCloseBtn");
+
+    if (lhSel) lhSel.value = String(lineHeight);
+    if (mgSel) mgSel.value = String(marginMode);
+    if (ffSel) ffSel.value = String(fontMode);
+
+    function applyPrefs(){
+      setCssPrefVars();
+      applyThemeToRendition();
+    }
+
+    lhSel && lhSel.addEventListener("change", () => {
+      lineHeight = lhSel.value || "1.65";
+      applyPrefs();
+    });
+    mgSel && mgSel.addEventListener("change", () => {
+      marginMode = mgSel.value || "normal";
+      applyPrefs();
+    });
+    ffSel && ffSel.addEventListener("change", () => {
+      fontMode = ffSel.value || "serif";
+      applyPrefs();
+    });
+
+    resetBtn && resetBtn.addEventListener("click", () => {
+      lineHeight = "1.65";
+      marginMode = "normal";
+      fontMode = "serif";
+      if (lhSel) lhSel.value = lineHeight;
+      if (mgSel) mgSel.value = marginMode;
+      if (ffSel) ffSel.value = fontMode;
+      applyPrefs();
+    });
+
+    closeBtn && closeBtn.addEventListener("click", closeDrawer);
+  }
+
+  // ====== Tap zones / selection-safe navigation =====
+  function hasSelection(){
+    try{
+      const sel = window.getSelection && window.getSelection();
+      return sel && String(sel.toString() || "").trim().length > 0;
+    } catch(e){ return false; }
+  }
+
+  function safePrev(){
+    if (!rendition) return;
+    if (hasSelection()) return;
+    try { rendition.prev(); } catch(e){}
+  }
+  function safeNext(){
+    if (!rendition) return;
+    if (hasSelection()) return;
+    try { rendition.next(); } catch(e){}
+  }
+
+  if (tapLeft) tapLeft.addEventListener("click", safePrev);
+  if (tapRight) tapRight.addEventListener("click", safeNext);
+
   // ====== EPUB ======
   async function openBook(item) {
     clearError();
@@ -1308,6 +1892,11 @@ table, thead, tbody, tr, td, th {
 
     showReader();
     elTitle.textContent = item.title || "Livro";
+
+    // reset progress UI state
+    locationsReady = false;
+    setProgressEnabled(false, "Progresso indisponível…");
+    updateProgressBar(0);
 
     const savedCfi = loadPosition(item);
     elProgress.textContent = savedCfi ? "Retomando…" : "Carregando…";
@@ -1344,14 +1933,23 @@ table, thead, tbody, tr, td, th {
       book = window.ePub(arrayBuffer);
 
       locReadyPromise = (book.ready ? book.ready.then(() => ensureLocations(item)) : ensureLocations(item));
+      locReadyPromise.then((ok) => {
+        locationsReady = !!ok;
+        if (locationsReady) setProgressEnabled(true, "Progresso");
+        else setProgressEnabled(false, "Progresso indisponível…");
+      }).catch(() => {
+        locationsReady = false;
+        setProgressEnabled(false, "Progresso indisponível…");
+      });
 
       rendition = book.renderTo("viewer", { width: "100%", height: "100%", spread: "none" });
 
+      setCssPrefVars();
       applyThemeToRendition();
       await applyFlowPaginated(false);
 
-      btnPrev.onclick = () => rendition && rendition.prev();
-      btnNext.onclick = () => rendition && rendition.next();
+      btnPrev.onclick = safePrev;
+      btnNext.onclick = safeNext;
 
       btnRestart.onclick = async () => {
         if (!currentItem || !rendition) return;
@@ -1370,6 +1968,10 @@ table, thead, tbody, tr, td, th {
 
       if (btnFs) btnFs.onclick = toggleFullscreen;
       if (btnFsExit) btnFsExit.onclick = exitFullscreen;
+
+      // TOC / Prefs drawer buttons
+      if (btnToc) btnToc.onclick = () => openDrawer("toc");
+      if (btnPrefs) btnPrefs.onclick = () => openDrawer("prefs");
 
       rendition.on("relocated", (location) => {
         savePosition(item, location);
@@ -1395,6 +1997,7 @@ table, thead, tbody, tr, td, th {
       applyThemeToRendition();
       await applyFlowPaginated(true);
 
+      // wait locations then refresh progress UI once
       try {
         await locReadyPromise;
         const loc = rendition && rendition.currentLocation ? rendition.currentLocation() : null;
@@ -1411,20 +2014,84 @@ table, thead, tbody, tr, td, th {
     }
   }
 
+  // ====== Progress bar interactions =====
+  let rangeDragging = false;
+  let rangeDragTimer = null;
+
+  if (progressRange) {
+    progressRange.addEventListener("input", () => {
+      if (!locationsReady) return;
+      rangeDragging = true;
+      clearTimeout(rangeDragTimer);
+
+      const p = Number(progressRange.value || 0) / 1000;
+      progressFill.style.width = (p * 100).toFixed(2) + "%";
+      // show UI hint while dragging
+      elProgress.textContent = (elProgress.textContent.split(" • ")[0] || "—") + ` • ${Math.round(p*100)}%`;
+
+      rangeDragTimer = setTimeout(() => { rangeDragging = false; }, 200);
+    });
+
+    progressRange.addEventListener("change", async () => {
+      if (!locationsReady) return;
+      const p = Number(progressRange.value || 0) / 1000;
+      await jumpToPercent(p);
+      rangeDragging = false;
+    });
+  }
+
+  // Back to catalog
   btnBack.addEventListener("click", async () => {
     clearError();
     stopReadingTimer();
+    closeDrawer();
     if (isFullscreen()) await exitFullscreen();
     showCatalog();
   });
 
+  // Keyboard navigation
   document.addEventListener("keydown", (e) => {
-    if (!rendition) return;
-    if (e.key === "ArrowLeft") { e.preventDefault(); try{ rendition.prev(); } catch(_e){} }
-    if (e.key === "ArrowRight"){ e.preventDefault(); try{ rendition.next(); } catch(_e){} }
+    // show UI if zen
+    if (zenOn) showUI();
+
+    // ignore when typing in inputs/selects
+    const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : "";
+    const typing = (tag === "input" || tag === "textarea" || tag === "select");
+
+    if (!rendition || !document.body.classList.contains("reader-open")) return;
+
+    if (!typing && e.key === "ArrowLeft") { e.preventDefault(); safePrev(); }
+    if (!typing && e.key === "ArrowRight"){ e.preventDefault(); safeNext(); }
+
+    if (!typing && e.key === " "){ // Space
+      e.preventDefault();
+      if (e.shiftKey) safePrev();
+      else safeNext();
+    }
   });
 
+  // Zen toggles also on double click / double tap anywhere in viewer shell
+  let lastTap = 0;
+  viewerShell && viewerShell.addEventListener("click", () => {
+    if (!document.body.classList.contains("reader-open")) return;
+    const now = Date.now();
+    if (now - lastTap < 280) {
+      setZen(!zenOn);
+    }
+    lastTap = now;
+  });
+
+  // ====== Theme init =====
+  function initTheme() {
+    const saved = localStorage.getItem("theme");
+    setTheme(saved === "night");
+    btnNight.addEventListener("click", () => setTheme(!document.body.classList.contains("night")));
+  }
+
+  // ====== Boot =====
+  setCssPrefVars();
   initTheme();
+  initZen();
   syncJustifyHyphenButtons();
   renderCatalog();
 })();
