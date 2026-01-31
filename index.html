@@ -615,6 +615,43 @@ body.night{
   outline: 3px solid color-mix(in srgb, var(--accent) 38%, transparent);
   outline-offset: 2px;
 }
+
+/* =========================================================
+   FIX: text colors in night mode (force UI readability)
+   (buttons/links can fall back to black in some browsers)
+   ========================================================= */
+body.night .btn,
+body.night .btn:visited,
+body.night .btn:hover,
+body.night .btn:active,
+body.night .btn:focus{
+  color: var(--fg) !important;
+}
+
+body.night .btn-primary,
+body.night .btn-primary:visited,
+body.night .btn-primary:hover,
+body.night .btn-primary:active,
+body.night .btn-primary:focus{
+  color: var(--accentfg) !important;
+}
+
+body.night .pill,
+body.night .save-badge,
+body.night .viewer-hint,
+body.night .reader-title,
+body.night .tagline{
+  color: var(--muted) !important;
+}
+
+body.night .fullscreen-exit{
+  color: var(--fg) !important;
+}
+
+/* Ensure nested elements (icons/spans) keep the right color */
+body.night .btn *{
+  color: inherit !important;
+}
 </style>
 </head>
 
