@@ -302,6 +302,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   position:relative;
 }
 
+/* ===== TOOLBAR (desktop default) ===== */
 .viewer-toolbar{
   display:flex;
   justify-content:space-between;
@@ -360,6 +361,60 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   white-space:nowrap;
 }
 .save-badge.show{opacity:1;transform:translateY(0)}
+
+/* ===== Mobile improvements: toolbar fully accessible ===== */
+@media (max-width:760px){
+  /* Bigger tap targets */
+  .btn{ padding:12px 12px; }
+
+  /* Toolbar becomes 2 rows and remains scrollable if needed */
+  .viewer-toolbar{
+    flex-wrap:wrap;
+    gap:8px;
+    padding:8px;
+  }
+
+  .viewer-left,
+  .viewer-center,
+  .viewer-right{
+    min-width:0;
+    flex:1 1 100%;
+    justify-content:flex-start;
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none; /* Firefox */
+    gap:8px;
+    padding-bottom:2px;
+  }
+  .viewer-left::-webkit-scrollbar,
+  .viewer-center::-webkit-scrollbar,
+  .viewer-right::-webkit-scrollbar{
+    display:none; /* Chrome/Safari */
+  }
+
+  /* Keep groups in sensible order */
+  .viewer-left{ order:1; }
+  .viewer-center{ order:2; justify-content:space-between; }
+  .viewer-right{ order:3; justify-content:flex-end; }
+
+  /* Progress text stays readable but can shrink */
+  .viewer-hint{
+    min-width:0;
+    flex:1 1 auto;
+    font-size:12px;
+    text-align:center;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+}
+
+/* Extra-small phones: hide non-essential badges to keep buttons visible */
+@media (max-width:420px){
+  #saveBadge{ display:none; }
+  #timePill{ display:none; }
+}
 
 #viewer{
   width:100%;
@@ -850,9 +905,9 @@ table, thead, tbody, tr, td, th {
             if (!doc) return;
             if (!doc.documentElement.getAttribute("lang")) doc.documentElement.setAttribute("lang","pt-BR");
             if (doc.body && !doc.body.getAttribute("lang")) doc.body.setAttribute("lang","pt-BR");
-          } catch(e) {}
+          } catch(e){}
         });
-      } catch(e) {}
+      } catch(e){}
     }
 
     if (!hardCssHookInstalled) {
@@ -862,7 +917,7 @@ table, thead, tbody, tr, td, th {
           const night = document.body.classList.contains("night");
           upsertHardStyle(contents, night);
         });
-      } catch(e) {}
+      } catch(e){}
     }
   }
 
@@ -1204,4 +1259,3 @@ table, thead, tbody, tr, td, th {
 
 </body>
 </html>
-
