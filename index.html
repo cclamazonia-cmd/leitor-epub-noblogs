@@ -378,7 +378,7 @@ p{margin:0 0 12px 0;color:var(--muted);line-height:1.55}
   color: var(--muted);
 }
 
-/* ✅ style mini pour "mostrar senha" */
+/* style mini pour "mostrar senha" */
 .restricted-row .showpw-label{
   display:flex;
   gap:8px;
@@ -850,7 +850,6 @@ body.night .btn *{ color: inherit !important; }
       <div class="restricted-row">
         <input id="pwInput" type="password" placeholder="Senha…" aria-label="Senha do catálogo restrito">
 
-        <!-- ✅ Mostrar/ocultar senha -->
         <label class="showpw-label" title="Mostrar/ocultar a senha digitada">
           <input id="showPwChk" type="checkbox" aria-label="Mostrar senha">
           mostrar senha
@@ -984,6 +983,9 @@ body.night .btn *{ color: inherit !important; }
   const ACCESS_KEY = "privateAccess";
   const ACCESS_HASH_KEY = "privateAccessHash";
 
+  // ✅ (AJOUT) mémorisation du scope catalogue
+  const SCOPE_KEY = "catalogScope";
+
   // =======================
   // DOM
   // =======================
@@ -1036,7 +1038,6 @@ body.night .btn *{ color: inherit !important; }
   const restrictedStatus = document.getElementById("restrictedStatus");
   const privateArea = document.getElementById("privateArea");
 
-  // ✅ checkbox mostrar/ocultar senha
   const showPwChk = document.getElementById("showPwChk");
 
   const drawerBackdrop = document.getElementById("drawerBackdrop");
@@ -1098,7 +1099,6 @@ body.night .btn *{ color: inherit !important; }
       .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   }
 
-  // ✅ helpers montrer/cacher senha + reset
   function resetPasswordVisibility(){
     try{
       if (pwInput) pwInput.type = "password";
@@ -1250,7 +1250,6 @@ body.night .btn *{ color: inherit !important; }
     if (currentItem) saveReadingTime(currentItem);
   });
 
-  // ✅ reset “mostrar senha” à la sortie de session
   window.addEventListener("pagehide", resetPasswordVisibility);
   window.addEventListener("beforeunload", resetPasswordVisibility);
 
@@ -1798,6 +1797,21 @@ table, thead, tbody, tr, td, th { background: transparent !important; }
     const unlocked = isUnlocked();
     privateArea.style.display = unlocked ? "block" : "none";
     restrictedStatus.textContent = unlocked ? "🔓 Desbloqueado" : "🔒 Bloqueado";
+
+    // ✅ (AJOUT) Restaurer/forcer le scope après refresh
+    if (scopeSelect) {
+      let savedScope = "public";
+      try { savedScope = localStorage.getItem(SCOPE_KEY) || "public"; } catch(e){}
+
+      if (unlocked) {
+        // Si déverrouillé, on évite de "perdre" le privé au refresh
+        scopeSelect.value = (savedScope === "public") ? "all" : savedScope;
+      } else {
+        // Si verrouillé, on empêche l'affichage "private/all"
+        scopeSelect.value = (savedScope === "private" || savedScope === "all") ? "public" : savedScope;
+      }
+    }
+
     if (!unlocked && scopeSelect && scopeSelect.value === "private") scopeSelect.value = "public";
     renderCatalog();
   }
@@ -1813,11 +1827,9 @@ table, thead, tbody, tr, td, th { background: transparent !important; }
     return bytesToHex(new Uint8Array(hash));
   }
 
-  // ✅ wiring du checkbox mostrar/ocultar
   if (showPwChk) {
     showPwChk.addEventListener("change", applyPasswordVisibilityFromUI);
   }
-  // ✅ reset au chargement (au cas où navigateur restaure l'état)
   resetPasswordVisibility();
 
   unlockBtn.addEventListener("click", async () => {
@@ -1832,11 +1844,9 @@ table, thead, tbody, tr, td, th { background: transparent !important; }
         setUnlocked(!!rememberChk.checked); // lembrar = persistant (localStorage)
         pwInput.value = "";
 
-        // ✅ au déblocage : remet aussi l'input en password + décoche "mostrar senha"
-        resetPasswordVisibility();
-
-        // ✅ show everything immediately after unlock
+        // ✅ show everything immediately after unlock + mémorisation
         if (scopeSelect) scopeSelect.value = "all";
+        try { localStorage.setItem(SCOPE_KEY, "all"); } catch(e){}
 
         updatePrivateUI();
       } else {
@@ -1850,9 +1860,6 @@ table, thead, tbody, tr, td, th { background: transparent !important; }
   lockBtn.addEventListener("click", () => {
     clearUnlocked();
     updatePrivateUI();
-
-    // ✅ au clic "Bloquear", on masque aussi la saisie + vide le champ
-    if (pwInput) pwInput.value = "";
     resetPasswordVisibility();
   });
 
@@ -1968,7 +1975,13 @@ table, thead, tbody, tr, td, th { background: transparent !important; }
 
   searchInput && searchInput.addEventListener("input", renderCatalog);
   sortSelect && sortSelect.addEventListener("change", renderCatalog);
-  scopeSelect && scopeSelect.addEventListener("change", renderCatalog);
+
+  // ✅ (MODIF) mémoriser le scope à chaque changement
+  scopeSelect && scopeSelect.addEventListener("change", () => {
+    try { localStorage.setItem(SCOPE_KEY, scopeSelect.value); } catch(e){}
+    renderCatalog();
+  });
+
   clearSearchBtn && clearSearchBtn.addEventListener("click", () => {
     if (searchInput) searchInput.value = "";
     renderCatalog();
@@ -2149,6 +2162,15 @@ table, thead, tbody, tr, td, th { background: transparent !important; }
   initTheme();
   initZen();
   syncJustifyHyphenButtons();
+
+  // ✅ (AJOUT) restaurer scope tôt si possible (sinon updatePrivateUI forcera)
+  try{
+    if (scopeSelect) {
+      const s = localStorage.getItem(SCOPE_KEY);
+      if (s) scopeSelect.value = s;
+    }
+  } catch(e){}
+
   updatePrivateUI();
   renderCatalog();
 
