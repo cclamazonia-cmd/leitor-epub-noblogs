@@ -479,6 +479,142 @@ body.fs .reader-top{display:none}
 }
 .footer-logo{max-height:150px;width:auto;display:block}
 body.reader-open .footer{display:none}
+
+/* =========================================================
+   Reader UI — enhanced visibility (PC + mobile, day/night)
+   (Override only, no JS/HTML changes)
+   ========================================================= */
+
+:root{
+  --ui-surface: color-mix(in srgb, var(--card) 86%, transparent);
+  --ui-surface-strong: color-mix(in srgb, var(--card) 94%, var(--bg));
+  --ui-border: color-mix(in srgb, var(--border) 70%, transparent);
+  --ui-shadow: 0 10px 26px rgba(0,0,0,.10);
+
+  --ui-btn-bg: color-mix(in srgb, var(--bg) 72%, var(--card));
+  --ui-btn-bg-hover: color-mix(in srgb, var(--bg) 60%, var(--card));
+  --ui-btn-border: color-mix(in srgb, var(--border) 85%, transparent);
+
+  --ui-btn-fg: var(--fg);
+  --ui-btn-fg-muted: color-mix(in srgb, var(--fg) 70%, var(--muted));
+
+  --ui-btn-radius: 14px;
+  --ui-btn-height: 42px;
+}
+
+body.night{
+  --ui-shadow: 0 14px 30px rgba(0,0,0,.40);
+  --ui-btn-bg: color-mix(in srgb, var(--bg) 58%, var(--card));
+  --ui-btn-bg-hover: color-mix(in srgb, var(--bg) 45%, var(--card));
+}
+
+/* Un peu plus de présence pour le viewer */
+.viewer{
+  box-shadow: var(--ui-shadow);
+}
+
+/* Toolbar sticky pour rester accessible pendant lecture */
+.viewer-toolbar{
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--ui-surface);
+  backdrop-filter: blur(10px) saturate(140%);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+/* Boutons de la toolbar : plus visibles (sans impacter le reste du site) */
+.viewer-toolbar .btn{
+  border: 1px solid var(--ui-btn-border);
+  background: var(--ui-btn-bg);
+  color: var(--ui-btn-fg);
+  height: var(--ui-btn-height);
+  padding: 0 12px;
+  border-radius: var(--ui-btn-radius);
+  box-shadow: 0 6px 16px rgba(0,0,0,.08);
+  font-weight: 700;
+  letter-spacing: .2px;
+}
+
+/* Hover/active plus nets */
+.viewer-toolbar .btn:hover{
+  background: var(--ui-btn-bg-hover);
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--ui-btn-border));
+}
+.viewer-toolbar .btn:active{
+  transform: translateY(1px) scale(.99);
+  box-shadow: 0 4px 10px rgba(0,0,0,.08);
+}
+
+/* Flèches / fullscreen un peu plus lisibles */
+#prevBtn, #nextBtn, #fsBtn{
+  font-size:16px;
+}
+
+/* Progress "pill" centrale plus lisible */
+.viewer-hint{
+  font-weight: 800;
+  color: var(--fg);
+  background: var(--ui-surface-strong);
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  padding: 8px 12px;
+  min-width: unset;
+  box-shadow: 0 6px 16px rgba(0,0,0,.06);
+}
+
+/* Time + badge : meilleur contraste */
+.pill, .save-badge{
+  background: var(--ui-surface-strong);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-btn-fg-muted);
+  font-weight: 700;
+}
+
+/* Spacing un poil plus confortable */
+.viewer-left, .viewer-center, .viewer-right{
+  gap: 10px;
+}
+
+/* Zone lecture : fond légèrement adouci */
+#viewer{
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+}
+
+/* Mobile : un chouïa plus compact sans perdre la lisibilité */
+@media (max-width:560px){
+  :root{ --ui-btn-height: 40px; }
+
+  .viewer-toolbar{
+    gap:8px;
+    padding:10px 10px;
+  }
+
+  .viewer-left, .viewer-right{
+    min-width: unset;
+  }
+
+  .viewer-hint{
+    font-size:12px;
+    padding:7px 10px;
+  }
+
+  #restartBtn{
+    padding: 0 10px;
+    font-weight: 800;
+  }
+
+  .pill{
+    font-size:11px;
+    padding:6px 8px;
+  }
+}
+
+/* Focus accessibilité : très visible */
+.viewer-toolbar .btn:focus{
+  outline: 3px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  outline-offset: 2px;
+}
 </style>
 </head>
 
